@@ -7,6 +7,7 @@ import json
 import httpx
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
+import os
 
 from auth import *
 from models import *
@@ -21,7 +22,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-redis_client = redis.Redis(host='localhost', port=6379, db=0)
+redis_url = os.getenv('UPSTASH_REDIS_URL', 'redis://localhost:6379')
+redis_client = redis.from_url(redis_url)
 security = HTTPBearer()
 
 # WebSocket connection manager
