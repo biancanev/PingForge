@@ -285,55 +285,147 @@ const SessionCard = ({ session, onSelect, onDelete, onCopyUrl }) => {
 const CreateSessionModal = ({ onClose, onCreate }) => {
   const [formData, setFormData] = useState({
     name: '',
-    description: ''
-  });
-  const [loading, setLoading] = useState(false);
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!formData.name.trim()) return;
-
-    setLoading(true);
-    try {
-      await onCreate(formData);
-    } finally {
-      setLoading(false);
+    description: '',
+    lifespan: '24h',
+    filters: {
+      allowed_ips: [],
+      allowed_methods: [],
+      blocked_ips: []
     }
-  };
+  });
+  const [showAdvanced, setShowAdvanced] = useState(false);
+
+  const lifespanOptions = [
+    { value: '1h', label: '1 Hour', description: 'Good for quick testing' },
+    { value: '24h', label: '24 Hours', description: 'Default option' },
+    { value: '7d', label: '7 Days', description: 'Extended debugging' },
+    { value: '14d', label: '2 Weeks', description: 'Maximum duration' }
+  ];
+
+  const methodOptions = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'];
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-md mx-4">
+      <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Create New Session</h3>
         
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Session Name *
-            </label>
-            <input
-              type="text"
-              required
-              value={formData.name}
-              onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-              placeholder="e.g., Stripe Payment Webhooks"
-            />
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Basic Settings */}
+          <div className="space-y-4">
+            <h4 className="font-medium text-gray-900">Basic Settings</h4>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Session Name *
+              </label>
+              <input
+                type="text"
+                required
+                value={formData.name}
+                onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                placeholder="e.g., Stripe Payment Webhooks"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Session Lifespan
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                {lifespanOptions.map(option => (
+                  <label key={option.value} className="relative">
+                    <input
+                      type="radio"
+                      name="lifespan"
+                      value={option.value}
+                      checked={formData.lifespan === option.value}
+                      onChange={(e) => setFormData(prev => ({ ...prev, lifespan: e.target.value }))}
+                      className="sr-only"
+                    />
+                    <div className={`p-3 border-2 rounded-lg cursor-pointer transition-all ${
+                      formData.lifespan === option.value 
+                        ? 'border-blue-500 bg-blue-50' 
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}>
+                      <div className="font-medium text-gray-900">{option.label}</div>
+                      <div className="text-xs text-gray-500">{option.description}</div>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
           </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Description (Optional)
-            </label>
-            <textarea
-              value={formData.description}
-              onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-              rows="3"
-              placeholder="Describe what this session is for..."
-            />
+
+          {/* Advanced Settings Toggle */}
+          <div className="border-t pt-4">
+            <button
+              type="button"
+              onClick={() => setShowAdvanced(!showAdvanced)}
+              className="flex items-center space-x-2 text-blue-600 hover:text-blue-700 font-medium"
+            >
+              <span>{showAdvanced ? 'Hide' : 'Show'} Advanced Filters</span>
+              <ChevronDown className={`transition-transform ${showAdvanced ? 'rotate-180' : ''}`} size={16} />
+            </button>
           </div>
-          
+
+          {/* Advanced Filters */}
+          {showAdvanced && (
+            <div className="space-y-4 bg-gray-50 p-4 rounded-lg">
+              <h4 className="font-medium text-gray-900">Request Filters</h4>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Allowed HTTP Methods
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {methodOptions.map(method => (
+                    <label key={method} className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        checked={formData.filters.allowed_methods.includes(method)}
+                        onChange={(e) => {
+                          const methods = e.target.checked
+                            ? [...formData.filters.allowed_methods, method]
+                            : formData.filters.allowed_methods.filter(m => m !== method);
+                          setFormData(prev => ({
+                            ...prev,
+                            filters: { ...prev.filters, allowed_methods: methods }
+                          }));
+                        }}
+                        className="rounded text-blue-600"
+                      />
+                      <span className="text-sm font-mono">{method}</span>
+                    </label>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Leave empty to allow all methods
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Allowed IP Addresses
+                </label>
+                <textarea
+                  value={formData.filters.allowed_ips.join('\n')}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    filters: {
+                      ...prev.filters,
+                      allowed_ips: e.target.value.split('\n').filter(ip => ip.trim())
+                    }
+                  }))}
+                  placeholder="192.168.1.1&#10;10.0.0.0/8&#10;Leave empty to allow all IPs"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono"
+                  rows="3"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Action Buttons */}
           <div className="flex space-x-3 pt-4">
             <button
               type="button"
@@ -345,7 +437,7 @@ const CreateSessionModal = ({ onClose, onCreate }) => {
             <button
               type="submit"
               disabled={loading || !formData.name.trim()}
-              className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg transition-colors disabled:cursor-not-allowed"
+              className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg transition-colors"
             >
               {loading ? 'Creating...' : 'Create Session'}
             </button>

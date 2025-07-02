@@ -1,6 +1,7 @@
 from pydantic import BaseModel, EmailStr
 from typing import Optional, List, Dict, Any
 from datetime import datetime
+from enum import Enum
 
 # Existing models
 class UserCreate(BaseModel):
@@ -91,3 +92,20 @@ class Collection(BaseModel):
     owner_id: str
     created_at: datetime
     is_active: bool = True
+
+class SessionLifespan(str, Enum):
+    ONE_HOUR = "1h"
+    TWENTY_FOUR_HOURS = "24h"
+    SEVEN_DAYS = "7d"
+    TWO_WEEKS = "14d"
+
+class SessionCreate(BaseModel):
+    name: str
+    description: Optional[str] = None
+    lifespan: SessionLifespan = SessionLifespan.TWENTY_FOUR_HOURS
+    filters: Optional[Dict] = None  # For IP/method filtering
+
+class SessionFilters(BaseModel):
+    allowed_ips: Optional[List[str]] = None
+    allowed_methods: Optional[List[str]] = None
+    blocked_ips: Optional[List[str]] = None

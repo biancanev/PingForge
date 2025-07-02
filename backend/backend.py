@@ -12,7 +12,43 @@ import os
 from auth import *
 from models import *
 
-app = FastAPI(title="Webhook Debugger API")
+# Helper function for TTL
+def get_lifespan_seconds(lifespan: SessionLifespan) -> int:
+    """Convert lifespan enum to seconds."""
+    lifespans = {
+        SessionLifespan.ONE_HOUR: 3600,
+        SessionLifespan.TWENTY_FOUR_HOURS: 86400,
+        SessionLifespan.SEVEN_DAYS: 86400 * 7,
+        SessionLifespan.TWO_WEEKS: 86400 * 14
+    }
+    return lifespans[lifespan]
+
+def is_request_allowed(session_filters: dict, request: Request) -> bool:
+    """Check if request passes session filters."""
+    if not session_filters:
+        return True
+    
+    client_ip = request.client.host if request.client else "unknown"
+    method = request.method
+    
+    # Check blocked IPs
+    if "blocked_ips" in session_filters:
+        if client_ip in session_filters["blocked_ips"]:
+            return False
+    
+    # Check allowed IPs (if specified, only these are allowed)
+    if "allowed_ips" in session_filters and session_filters["allowed_ips"]:
+        if client_ip not in session_filters["allowed_ips"]:
+            return False
+    
+    # Check allowed methods (if specified, only these are allowed)
+    if "allowed_methods" in session_filters and session_filters["allowed_methods"]:
+        if method not in session_filters["allowed_methods"]:
+            return False
+    
+    return True
+
+app = FastAPI(title="API Testing Suite")
 
 app.add_middleware(
     CORSMiddleware,
@@ -164,13 +200,18 @@ async def create_session(session_data: SessionCreate, current_user: User = Depen
         "created_at": datetime.now().isoformat(),
         "owner_id": current_user.id,
         "request_count": 0,
-        "is_active": True
+        "is_active": True,
+        "lifespan": session_data.lifespan,
+        "filters": session_data.filters or {}
     }
     
-    # Store session
+    # Use dynamic TTL based on lifespan
+    ttl_seconds = get_lifespan_seconds(session_data.lifespan)
+    
     redis_client.set(f"session:{session_id}", json.dumps(session))
     redis_client.sadd(f"user_sessions:{current_user.id}", session_id)
-    redis_client.expire(f"session:{session_id}", 86400 * 7)  # 7 days
+    redis_client.expire(f"session:{session_id}", ttl_seconds)
+    redis_client.expire(f"requests:{session_id}", ttl_seconds)
     
     return Session(**session)
 
@@ -227,6 +268,10 @@ async def capture_webhook(session_id: str, request: Request):
     session_data = redis_client.get(f"session:{session_id}")
     if not session_data:
         raise HTTPException(status_code=404, detail="Session not found")
+    
+    if not is_request_allowed(session.get("filters", {}), request):
+        # Still return 200 but don't store the request
+        return {"status": "filtered", "reason": "Request blocked by session filters"}
     
     body = await request.body()
     webhook_request = {
