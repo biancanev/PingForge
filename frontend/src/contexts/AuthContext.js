@@ -1,7 +1,7 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import Cookies from 'js-cookie';
 
-const baseURL = "https://pingforge.pages.dev/"
+const baseURL = "https://pingforge.onrender.com/"
 
 const AuthContext = createContext();
 
@@ -29,7 +29,7 @@ export const AuthProvider = ({ children }) => {
 
   const fetchUserProfile = async (token) => {
     try {
-      const response = await fetch('https://pingforge.pages.dev/auth/me', {
+      const response = await fetch('https://pingforge.onrender.com/auth/me', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -51,7 +51,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const login = async (email, password) => {
-    const response = await fetch('https://pingforge.pages.dev/auth/login', {
+    const response = await fetch('https://pingforge.onrender.com/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password })
@@ -69,7 +69,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const register = async (email, password, fullName) => {
-    const response = await fetch('https://pingforge.pages.dev/auth/register', {
+    const response = await fetch('https://pingforge.onrender.com/auth/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ 
