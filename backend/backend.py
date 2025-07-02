@@ -16,7 +16,7 @@ app = FastAPI(title="Webhook Debugger API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["https://pingforge.onrender.com", "https://pingforge.pages.dev"],
     allow_credentials=False,  # Must be False when using "*"
     allow_methods=["*"],
     allow_headers=["*"],
