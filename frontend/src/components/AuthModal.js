@@ -29,7 +29,7 @@ const AuthModal = ({ isOpen, onClose, onSuccess }) => {
         ? { email: formData.email, password: formData.password }
         : { email: formData.email, password: formData.password, full_name: formData.full_name };
 
-      const response = await fetch(`http://localhost:8000${endpoint}`, {
+      const response = await fetch(`https://pingforge.onrender.com${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
