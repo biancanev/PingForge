@@ -13,23 +13,10 @@ from models import *
 
 app = FastAPI(title="Webhook Debugger API")
 
-def is_allowed_origin(origin: str) -> bool:
-    allowed_patterns = [
-        "http://localhost:3000",
-        "https://pingforge.pages.dev",
-        "https://pingforge.onrender.com",
-    ]
-    
-    # Allow any *.pingforge.pages.dev subdomain
-    if origin and origin.endswith(".pingforge.pages.dev"):
-        return True
-        
-    return origin in allowed_patterns
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=r"https://.*\.pingforge\.pages\.dev",  # Regex pattern
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,  # Must be False when using "*"
     allow_methods=["*"],
     allow_headers=["*"],
 )
