@@ -51,7 +51,7 @@ const RequestInspector = ({ request, sessionId }) => {
     'https://httpbin.org/post',
     'https://webhook.site/unique-id',
     'https://requestcatcher.com/test',
-    'http://localhost:3001/webhook'
+    'https://pingforge.onrender.com/webhook'
   ];
 
   // Rest of your component stays the same...

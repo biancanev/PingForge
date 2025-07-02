@@ -52,7 +52,7 @@ const SessionsDashboard = ({ onSessionSelect }) => {
   };
 
   const copyWebhookUrl = async (session) => {
-    const url = `http://localhost:8000${session.webhook_url}`;
+    const url = `pingforge.onrender.com${session.webhook_url}`;
     await navigator.clipboard.writeText(url);
     // You could add a toast notification here
     alert('Webhook URL copied to clipboard!');

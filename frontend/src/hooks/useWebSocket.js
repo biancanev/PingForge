@@ -11,7 +11,7 @@ export const useWebSocket = (sessionId) => {
     console.log(`🔌 Connecting to WebSocket for session: ${sessionId}`);
     
     // Connect to WebSocket
-    socketRef.current = new WebSocket(`ws://localhost:8000/ws/${sessionId}`);
+    socketRef.current = new WebSocket(`wss://pingforge.onrender.com/ws/${sessionId}`);
     
     socketRef.current.onopen = () => {
       setIsConnected(true);

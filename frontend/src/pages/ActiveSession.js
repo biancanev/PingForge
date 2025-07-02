@@ -89,10 +89,10 @@ const ActiveSession = ({ session, onSessionCreated, onBack }) => {
                 <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
                   <h3 className="text-lg font-semibold text-gray-900 mb-4">Webhook URL</h3>
                   <div className="bg-gray-50 border border-gray-300 rounded-lg p-3 font-mono text-sm break-all">
-                    http://localhost:8000{session?.webhook_url}
+                    http://pingforge.onrender.com{session?.webhook_url}
                   </div>
                   <button
-                    onClick={() => navigator.clipboard.writeText(`http://localhost:8000${session?.webhook_url}`)}
+                    onClick={() => navigator.clipboard.writeText(`http://pingforge.onrender.com${session?.webhook_url}`)}
                     className="mt-3 w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg text-sm font-medium transition-colors"
                   >
                     Copy URL
@@ -145,7 +145,7 @@ const ActiveSession = ({ session, onSessionCreated, onBack }) => {
                   </label>
                   <input
                     type="text"
-                    value={`http://localhost:8000${session?.webhook_url}` || ''}
+                    value={`http://pingforge.onrender.com${session?.webhook_url}` || ''}
                     readOnly
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 font-mono text-sm"
                   />
