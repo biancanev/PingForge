@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Activity, User, LogOut, Settings } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import AuthModal from './AuthModal';
+import PingForgeLogo from './logo';
 
 const Header = ({ currentSession }) => {
   const { user, logout, isAuthenticated } = useAuth();
@@ -20,9 +21,11 @@ const Header = ({ currentSession }) => {
         <div className="container mx-auto px-4 py-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-2 rounded-lg">
-                <Activity className="text-white" size={24} />
-              </div>
+              <PingForgeLogo 
+                  size="lg" 
+                  animated={true}
+                  className="text-blue-600"
+                />
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">PingForge</h1>
                 <p className="text-gray-600 text-sm">Real-time API inspection and testing</p>
