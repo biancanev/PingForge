@@ -1,0 +1,7 @@
+backend/
+pyproject.toml
+poetry.lock
+*.py
+__pycache__/
+.env
+requirements.txt
