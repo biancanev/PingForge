@@ -28,16 +28,6 @@ class SessionCreate(BaseModel):
     name: str
     description: Optional[str] = None
 
-class Session(BaseModel):
-    id: str
-    name: str
-    description: Optional[str]
-    webhook_url: str
-    created_at: datetime
-    owner_id: str
-    request_count: int = 0
-    is_active: bool = True
-
 # New models for Collections and Environments
 class EnvironmentVariable(BaseModel):
     key: str
@@ -109,3 +99,15 @@ class SessionFilters(BaseModel):
     allowed_ips: Optional[List[str]] = None
     allowed_methods: Optional[List[str]] = None
     blocked_ips: Optional[List[str]] = None
+
+class Session(BaseModel):
+    id: str
+    name: str
+    description: Optional[str] = None
+    webhook_url: str
+    created_at: str
+    owner_id: str
+    request_count: int = 0
+    is_active: bool = True
+    lifespan: Optional[SessionLifespan] = SessionLifespan.TWENTY_FOUR_HOURS
+    filters: Optional[Dict] = None

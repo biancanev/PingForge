@@ -62,8 +62,13 @@ export const authAPI = {
 
 export const sessionAPI = {
   // Existing session methods
-  createSession: async (name, description = '') => {
-    const response = await api.post('/sessions', { name, description });
+  createSession: async (name, description = '', lifespan = '24h', filters = {}) => {
+    const response = await api.post('/sessions', { 
+      name, 
+      description, 
+      lifespan, 
+      filters 
+    });
     return response.data;
   },
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Play, Pause, Copy, Calendar, Activity, Globe, MoreVertical } from 'lucide-react';
+import { Plus, Trash2, Play, Pause, Copy, Calendar, Activity, Globe, MoreVertical, ChevronDown } from 'lucide-react';
 import { sessionAPI } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -28,12 +28,23 @@ const SessionsDashboard = ({ onSessionSelect }) => {
 
   const handleCreateSession = async (sessionData) => {
     try {
-      const newSession = await sessionAPI.createSession(sessionData.name, sessionData.description);
+      // Pass all the new fields to the API
+      const newSession = await sessionAPI.createSession(
+        sessionData.name, 
+        sessionData.description,
+        sessionData.lifespan,
+        sessionData.filters
+      );
       setSessions(prev => [newSession, ...prev]);
       setShowCreateModal(false);
     } catch (error) {
       console.error('Failed to create session:', error);
-      alert('Failed to create session. Please try again.');
+      
+      // More detailed error handling
+      const errorMessage = error.response?.data?.detail || 
+                          error.message || 
+                          'Failed to create session. Please try again.';
+      alert(errorMessage);
     }
   };
 
@@ -293,7 +304,20 @@ const CreateSessionModal = ({ onClose, onCreate }) => {
       blocked_ips: []
     }
   });
+  const [loading, setLoading] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!formData.name.trim()) return;
+
+    setLoading(true);
+    try {
+      await onCreate(formData);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const lifespanOptions = [
     { value: '1h', label: '1 Hour', description: 'Good for quick testing' },
@@ -325,6 +349,19 @@ const CreateSessionModal = ({ onClose, onCreate }) => {
                 onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                 placeholder="e.g., Stripe Payment Webhooks"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Description (Optional)
+              </label>
+              <textarea
+                value={formData.description}
+                onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                rows="3"
+                placeholder="Describe what this session is for..."
               />
             </div>
             
@@ -421,6 +458,9 @@ const CreateSessionModal = ({ onClose, onCreate }) => {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono"
                   rows="3"
                 />
+                <p className="text-xs text-gray-500 mt-1">
+                  One IP address per line. CIDR notation supported.
+                </p>
               </div>
             </div>
           )}
@@ -437,7 +477,7 @@ const CreateSessionModal = ({ onClose, onCreate }) => {
             <button
               type="submit"
               disabled={loading || !formData.name.trim()}
-              className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg transition-colors"
+              className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg transition-colors disabled:cursor-not-allowed"
             >
               {loading ? 'Creating...' : 'Create Session'}
             </button>
@@ -446,6 +486,6 @@ const CreateSessionModal = ({ onClose, onCreate }) => {
       </div>
     </div>
   );
-}; 
+};
 
 export default SessionsDashboard;
