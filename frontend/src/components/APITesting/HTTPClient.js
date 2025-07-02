@@ -165,8 +165,49 @@ const HttpClient = ({ selectedEnvironment, initialRequest, onRequestChange }) =>
     }
   };
 
-  // Rest of your existing component code (addKeyValue, updateKeyValue, etc.)
-  // ... keep all the existing functions ...
+  const addKeyValue = (type) => {
+    setRequest(prev => ({
+      ...prev,
+      [type]: [...prev[type], { key: '', value: '', enabled: true }]
+    }));
+  };
+
+  const updateKeyValue = (type, index, field, value) => {
+    setRequest(prev => ({
+      ...prev,
+      [type]: prev[type].map((item, i) => 
+        i === index ? { ...item, [field]: value } : item
+      )
+    }));
+  };
+
+  const removeKeyValue = (type, index) => {
+    setRequest(prev => ({
+      ...prev,
+      [type]: prev[type].filter((_, i) => i !== index)
+    }));
+  };
+
+  const updateBodyContent = (content) => {
+    setRequest(prev => ({
+      ...prev,
+      body: { ...prev.body, content }
+    }));
+  };
+
+  const updateBodyType = (type) => {
+    setRequest(prev => ({
+      ...prev,
+      body: { ...prev.body, type, content: '' }
+    }));
+  };
+
+  const updateAuth = (field, value) => {
+    setRequest(prev => ({
+      ...prev,
+      auth: { ...prev.auth, [field]: value }
+    }));
+  };
 
   return (
     <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
@@ -230,9 +271,261 @@ const HttpClient = ({ selectedEnvironment, initialRequest, onRequestChange }) =>
             </div>
           )}
         </div>
+        {/* Tab Navigation */}
+        <div className="border-b border-gray-200 mb-6">
+          <div className="flex space-x-6">
+            {['headers', 'params', 'body', 'auth'].map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`py-2 px-1 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === tab
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                {tab.charAt(0).toUpperCase() + tab.slice(1)}
+              </button>
+            ))}
+          </div>
+        </div>
 
-        {/* Rest of your existing component JSX */}
-        {/* ... keep all the existing tabs and form elements ... */}
+        {/* Tab Content */}
+        <div className="space-y-4">
+          {/* Headers Tab */}
+          {activeTab === 'headers' && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-medium text-gray-700">Headers</h3>
+                <button
+                  onClick={() => addKeyValue('headers')}
+                  className="text-blue-600 hover:text-blue-700 text-sm flex items-center space-x-1"
+                >
+                  <Plus size={14} />
+                  <span>Add Header</span>
+                </button>
+              </div>
+              
+              {request.headers.map((header, index) => (
+                <div key={index} className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    checked={header.enabled}
+                    onChange={(e) => updateKeyValue('headers', index, 'enabled', e.target.checked)}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <input
+                    type="text"
+                    value={header.key}
+                    onChange={(e) => updateKeyValue('headers', index, 'key', e.target.value)}
+                    placeholder="Content-Type"
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm"
+                  />
+                  <input
+                    type="text"
+                    value={header.value}
+                    onChange={(e) => updateKeyValue('headers', index, 'value', e.target.value)}
+                    placeholder="application/json"
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm"
+                  />
+                  <button
+                    onClick={() => removeKeyValue('headers', index)}
+                    className="text-red-500 hover:text-red-700 p-1"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Params Tab */}
+          {activeTab === 'params' && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-medium text-gray-700">Query Parameters</h3>
+                <button
+                  onClick={() => addKeyValue('params')}
+                  className="text-blue-600 hover:text-blue-700 text-sm flex items-center space-x-1"
+                >
+                  <Plus size={14} />
+                  <span>Add Parameter</span>
+                </button>
+              </div>
+              
+              {request.params.map((param, index) => (
+                <div key={index} className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    checked={param.enabled}
+                    onChange={(e) => updateKeyValue('params', index, 'enabled', e.target.checked)}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <input
+                    type="text"
+                    value={param.key}
+                    onChange={(e) => updateKeyValue('params', index, 'key', e.target.value)}
+                    placeholder="page"
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm"
+                  />
+                  <input
+                    type="text"
+                    value={param.value}
+                    onChange={(e) => updateKeyValue('params', index, 'value', e.target.value)}
+                    placeholder="1"
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm"
+                  />
+                  <button
+                    onClick={() => removeKeyValue('params', index)}
+                    className="text-red-500 hover:text-red-700 p-1"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Body Tab */}
+          {activeTab === 'body' && (
+            <div className="space-y-4">
+              <div className="flex items-center space-x-4">
+                <h3 className="text-sm font-medium text-gray-700">Request Body</h3>
+                <select
+                  value={request.body.type}
+                  onChange={(e) => updateBodyType(e.target.value)}
+                  className="px-3 py-1 border border-gray-300 rounded text-sm bg-white"
+                >
+                  <option value="none">None</option>
+                  <option value="json">JSON</option>
+                  <option value="form">Form URL Encoded</option>
+                  <option value="raw">Raw Text</option>
+                </select>
+              </div>
+
+              {request.body.type !== 'none' && (
+                <div>
+                  <textarea
+                    value={request.body.content}
+                    onChange={(e) => updateBodyContent(e.target.value)}
+                    placeholder={
+                      request.body.type === 'json' 
+                        ? '{\n  "key": "value",\n  "userId": "{{userId}}"\n}'
+                        : request.body.type === 'form'
+                        ? 'key1=value1&key2=value2'
+                        : 'Raw text content here...'
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm font-mono"
+                    rows={8}
+                  />
+                  {selectedEnvironment && request.body.content.includes('{{') && (
+                    <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs">
+                      <div className="font-medium text-blue-800 mb-1">Preview:</div>
+                      <pre className="text-blue-700 whitespace-pre-wrap">
+                        {replaceEnvironmentVariables(request.body.content)}
+                      </pre>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Auth Tab */}
+          {activeTab === 'auth' && (
+            <div className="space-y-4">
+              <div className="flex items-center space-x-4">
+                <h3 className="text-sm font-medium text-gray-700">Authentication</h3>
+                <select
+                  value={request.auth.type}
+                  onChange={(e) => updateAuth('type', e.target.value)}
+                  className="px-3 py-1 border border-gray-300 rounded text-sm bg-white"
+                >
+                  <option value="none">No Auth</option>
+                  <option value="bearer">Bearer Token</option>
+                  <option value="basic">Basic Auth</option>
+                  <option value="api-key">API Key</option>
+                </select>
+              </div>
+
+              {/* Bearer Token */}
+              {request.auth.type === 'bearer' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Bearer Token
+                  </label>
+                  <input
+                    type="text"
+                    value={request.auth.token}
+                    onChange={(e) => updateAuth('token', e.target.value)}
+                    placeholder="{{authToken}} or your-token-here"
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm"
+                  />
+                </div>
+              )}
+
+              {/* Basic Auth */}
+              {request.auth.type === 'basic' && (
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Username
+                    </label>
+                    <input
+                      type="text"
+                      value={request.auth.username}
+                      onChange={(e) => updateAuth('username', e.target.value)}
+                      placeholder="{{username}} or your-username"
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Password
+                    </label>
+                    <input
+                      type="password"
+                      value={request.auth.password}
+                      onChange={(e) => updateAuth('password', e.target.value)}
+                      placeholder="{{password}} or your-password"
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* API Key */}
+              {request.auth.type === 'api-key' && (
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Key
+                    </label>
+                    <input
+                      type="text"
+                      value={request.auth.key}
+                      onChange={(e) => updateAuth('key', e.target.value)}
+                      placeholder="X-API-Key"
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Value
+                    </label>
+                    <input
+                      type="text"
+                      value={request.auth.value}
+                      onChange={(e) => updateAuth('value', e.target.value)}
+                      placeholder="{{apiKey}} or your-api-key"
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Response Section */}
