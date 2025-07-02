@@ -15,7 +15,7 @@ const PingForgeLogo = (
 
     const currentSize = sizes[size];
     const IconSVG = () => (
-        <svg width="120" height="120" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+        <svg width="60" height="60" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
         <rect x="5" y="5" width="110" height="110" fill="#61dbfb" rx="8"/>
 
         <circle cx="60" cy="60" r="45" fill="none" stroke="#F9FAFB" stroke-width="3"/>
