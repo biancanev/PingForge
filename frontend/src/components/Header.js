@@ -22,7 +22,7 @@ const Header = ({ currentSession }) => {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <PingForgeLogo 
-                  size="lg" 
+                  size="md" 
                   animated={true}
                   className="text-blue-600"
                 />
