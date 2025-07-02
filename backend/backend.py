@@ -8,8 +8,8 @@ import httpx
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 
-from .auth import verify_password, get_password_hash, create_access_token, verify_token, ACCESS_TOKEN_EXPIRE_MINUTES
-from .models import *
+from auth import *
+from models import *
 
 app = FastAPI(title="Webhook Debugger API")
 
