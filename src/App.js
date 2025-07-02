@@ -1,24 +1,29 @@
-import logo from './logo.svg';
-import './App.css';
+import React, { useState } from 'react';
+import { AuthProvider } from './contexts/AuthContext';
+import Dashboard from './pages/Dashboard';
+import ActiveSession from './pages/ActiveSession';
 
 function App() {
+  const [currentSession, setCurrentSession] = useState(null);
+
+  const handleBackToSessions = () => {
+    setCurrentSession(null);
+  };
+
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
-    </div>
+    <AuthProvider>
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-100">
+        {!currentSession ? (
+          <Dashboard onSessionCreated={setCurrentSession} />
+        ) : (
+          <ActiveSession 
+            session={currentSession} 
+            onSessionCreated={setCurrentSession}
+            onBack={handleBackToSessions}
+          />
+        )}
+      </div>
+    </AuthProvider>
   );
 }
 
