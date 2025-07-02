@@ -269,10 +269,31 @@ async def capture_webhook(session_id: str, request: Request):
     if not session_data:
         raise HTTPException(status_code=404, detail="Session not found")
     
-    if not is_request_allowed(session.get("filters", {}), request):
-        # Still return 200 but don't store the request
-        return {"status": "filtered", "reason": "Request blocked by session filters"}
+    # Parse session data FIRST
+    session = json.loads(session_data)
     
+    # Apply filters if they exist
+    session_filters = session.get("filters", {})
+    if session_filters:
+        client_ip = request.client.host if request.client else "unknown"
+        method = request.method
+        
+        # Check blocked IPs
+        if "blocked_ips" in session_filters and session_filters["blocked_ips"]:
+            if client_ip in session_filters["blocked_ips"]:
+                return {"status": "filtered", "reason": "IP address blocked"}
+        
+        # Check allowed IPs (if specified, only these are allowed)
+        if "allowed_ips" in session_filters and session_filters["allowed_ips"]:
+            if client_ip not in session_filters["allowed_ips"]:
+                return {"status": "filtered", "reason": "IP address not in allowlist"}
+        
+        # Check allowed methods (if specified, only these are allowed)
+        if "allowed_methods" in session_filters and session_filters["allowed_methods"]:
+            if method not in session_filters["allowed_methods"]:
+                return {"status": "filtered", "reason": "HTTP method not allowed"}
+    
+    # Continue with existing webhook capture logic
     body = await request.body()
     webhook_request = {
         "id": str(uuid.uuid4()),
@@ -289,7 +310,6 @@ async def capture_webhook(session_id: str, request: Request):
     redis_client.expire(f"requests:{session_id}", 86400 * 7)  # 7 days
     
     # Update session request count
-    session = json.loads(session_data)
     session["request_count"] = redis_client.llen(f"requests:{session_id}")
     redis_client.set(f"session:{session_id}", json.dumps(session))
     
