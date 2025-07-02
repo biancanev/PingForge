@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 
 from .auth import verify_password, get_password_hash, create_access_token, verify_token, ACCESS_TOKEN_EXPIRE_MINUTES
-from .models import UserCreate, UserLogin, User, Token, SessionCreate, Session
+from .models import *
 
 app = FastAPI(title="Webhook Debugger API")
 
@@ -293,3 +293,238 @@ async def create_legacy_webhook_session():
         "session_id": session_id, 
         "webhook_url": f"/hooks/{session_id}"
     }
+
+# Environment Management Endpoints
+@app.post("/environments", response_model=Environment)
+async def create_environment(environment_data: EnvironmentCreate, current_user: User = Depends(get_current_user)):
+    env_id = str(uuid.uuid4())
+    
+    environment = {
+        "id": env_id,
+        "name": environment_data.name,
+        "description": environment_data.description,
+        "variables": [var.dict() for var in environment_data.variables],
+        "owner_id": current_user.id,
+        "created_at": datetime.now().isoformat(),
+        "is_active": True
+    }
+    
+    # Store environment
+    redis_client.set(f"environment:{env_id}", json.dumps(environment))
+    redis_client.sadd(f"user_environments:{current_user.id}", env_id)
+    
+    return Environment(**environment)
+
+@app.get("/environments", response_model=List[Environment])
+async def get_user_environments(current_user: User = Depends(get_current_user)):
+    env_ids = redis_client.smembers(f"user_environments:{current_user.id}")
+    environments = []
+    
+    for env_id in env_ids:
+        env_data = redis_client.get(f"environment:{env_id.decode()}")
+        if env_data:
+            environments.append(Environment(**json.loads(env_data)))
+    
+    return sorted(environments, key=lambda x: x.created_at, reverse=True)
+
+@app.put("/environments/{env_id}", response_model=Environment)
+async def update_environment(env_id: str, environment_data: EnvironmentCreate, current_user: User = Depends(get_current_user)):
+    # Check if environment exists and user owns it
+    env_data = redis_client.get(f"environment:{env_id}")
+    if not env_data:
+        raise HTTPException(status_code=404, detail="Environment not found")
+    
+    environment = json.loads(env_data)
+    if environment["owner_id"] != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to update this environment")
+    
+    # Update environment
+    environment.update({
+        "name": environment_data.name,
+        "description": environment_data.description,
+        "variables": [var.dict() for var in environment_data.variables]
+    })
+    
+    redis_client.set(f"environment:{env_id}", json.dumps(environment))
+    return Environment(**environment)
+
+@app.delete("/environments/{env_id}")
+async def delete_environment(env_id: str, current_user: User = Depends(get_current_user)):
+    # Check if environment exists and user owns it
+    env_data = redis_client.get(f"environment:{env_id}")
+    if not env_data:
+        raise HTTPException(status_code=404, detail="Environment not found")
+    
+    environment = json.loads(env_data)
+    if environment["owner_id"] != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to delete this environment")
+    
+    # Delete environment
+    redis_client.delete(f"environment:{env_id}")
+    redis_client.srem(f"user_environments:{current_user.id}", env_id)
+    
+    return {"message": "Environment deleted successfully"}
+
+# Collection Management Endpoints
+@app.post("/collections", response_model=Collection)
+async def create_collection(collection_data: CollectionCreate, current_user: User = Depends(get_current_user)):
+    collection_id = str(uuid.uuid4())
+    
+    collection = {
+        "id": collection_id,
+        "name": collection_data.name,
+        "description": collection_data.description,
+        "requests": [],
+        "environment_id": collection_data.environment_id,
+        "owner_id": current_user.id,
+        "created_at": datetime.now().isoformat(),
+        "is_active": True
+    }
+    
+    # Store collection
+    redis_client.set(f"collection:{collection_id}", json.dumps(collection))
+    redis_client.sadd(f"user_collections:{current_user.id}", collection_id)
+    
+    return Collection(**collection)
+
+@app.get("/collections", response_model=List[Collection])
+async def get_user_collections(current_user: User = Depends(get_current_user)):
+    collection_ids = redis_client.smembers(f"user_collections:{current_user.id}")
+    collections = []
+    
+    for collection_id in collection_ids:
+        collection_data = redis_client.get(f"collection:{collection_id.decode()}")
+        if collection_data:
+            collections.append(Collection(**json.loads(collection_data)))
+    
+    return sorted(collections, key=lambda x: x.created_at, reverse=True)
+
+@app.get("/collections/{collection_id}", response_model=Collection)
+async def get_collection(collection_id: str, current_user: User = Depends(get_current_user)):
+    collection_data = redis_client.get(f"collection:{collection_id}")
+    if not collection_data:
+        raise HTTPException(status_code=404, detail="Collection not found")
+    
+    collection = json.loads(collection_data)
+    if collection["owner_id"] != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to view this collection")
+    
+    return Collection(**collection)
+
+@app.post("/collections/{collection_id}/requests", response_model=CollectionRequest)
+async def add_request_to_collection(collection_id: str, request_data: CollectionRequestCreate, current_user: User = Depends(get_current_user)):
+    # Check if collection exists and user owns it
+    collection_data = redis_client.get(f"collection:{collection_id}")
+    if not collection_data:
+        raise HTTPException(status_code=404, detail="Collection not found")
+    
+    collection = json.loads(collection_data)
+    if collection["owner_id"] != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to modify this collection")
+    
+    # Create new request
+    request_id = str(uuid.uuid4())
+    new_request = {
+        "id": request_id,
+        "name": request_data.name,
+        "description": request_data.description,
+        "request_data": request_data.request_data.dict(),
+        "created_at": datetime.now().isoformat()
+    }
+    
+    # Add request to collection
+    collection["requests"].append(new_request)
+    redis_client.set(f"collection:{collection_id}", json.dumps(collection))
+    
+    return CollectionRequest(**new_request)
+
+@app.delete("/collections/{collection_id}")
+async def delete_collection(collection_id: str, current_user: User = Depends(get_current_user)):
+    # Check if collection exists and user owns it
+    collection_data = redis_client.get(f"collection:{collection_id}")
+    if not collection_data:
+        raise HTTPException(status_code=404, detail="Collection not found")
+    
+    collection = json.loads(collection_data)
+    if collection["owner_id"] != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to delete this collection")
+    
+    # Delete collection
+    redis_client.delete(f"collection:{collection_id}")
+    redis_client.srem(f"user_collections:{current_user.id}", collection_id)
+    
+    return {"message": "Collection deleted successfully"}
+
+# Execute request with environment variables
+@app.post("/collections/{collection_id}/requests/{request_id}/execute")
+async def execute_collection_request(
+    collection_id: str, 
+    request_id: str, 
+    current_user: User = Depends(get_current_user)
+):
+    # Get collection
+    collection_data = redis_client.get(f"collection:{collection_id}")
+    if not collection_data:
+        raise HTTPException(status_code=404, detail="Collection not found")
+    
+    collection = json.loads(collection_data)
+    if collection["owner_id"] != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to access this collection")
+    
+    # Find request
+    request = None
+    for req in collection["requests"]:
+        if req["id"] == request_id:
+            request = req
+            break
+    
+    if not request:
+        raise HTTPException(status_code=404, detail="Request not found in collection")
+    
+    # Get environment variables if environment is set
+    variables = {}
+    if collection.get("environment_id"):
+        env_data = redis_client.get(f"environment:{collection['environment_id']}")
+        if env_data:
+            environment = json.loads(env_data)
+            for var in environment["variables"]:
+                if var["enabled"]:
+                    variables[var["key"]] = var["value"]
+    
+    # Replace variables in request
+    request_data = request["request_data"].copy()
+    
+    # Replace variables in URL
+    url = request_data["url"]
+    for key, value in variables.items():
+        url = url.replace(f"{{{{{key}}}}}", value)
+    
+    # Replace variables in headers
+    headers = {}
+    for header_key, header_value in request_data.get("headers", {}).items():
+        for var_key, var_value in variables.items():
+            header_value = header_value.replace(f"{{{{{var_key}}}}}", var_value)
+        headers[header_key] = header_value
+    
+    try:
+        # Execute the request using httpx
+        async with httpx.AsyncClient() as client:
+            response = await client.request(
+                method=request_data["method"],
+                url=url,
+                headers=headers,
+                params=request_data.get("params", {}),
+                json=request_data.get("body") if request_data.get("body") else None,
+                timeout=30.0
+            )
+            
+            return {
+                "status_code": response.status_code,
+                "headers": dict(response.headers),
+                "body": response.text,
+                "request_url": str(response.url),
+                "execution_time": response.elapsed.total_seconds() if hasattr(response, 'elapsed') else 0
+            }
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Request execution failed: {str(e)}")

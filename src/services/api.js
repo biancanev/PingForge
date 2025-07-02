@@ -61,36 +61,84 @@ export const authAPI = {
 };
 
 export const sessionAPI = {
-  // Create a new session
+  // Existing session methods
   createSession: async (name, description = '') => {
     const response = await api.post('/sessions', { name, description });
     return response.data;
   },
 
-  // Get user's sessions
   getUserSessions: async () => {
     const response = await api.get('/sessions');
     return response.data;
   },
 
-  // Delete a session
   deleteSession: async (sessionId) => {
     const response = await api.delete(`/sessions/${sessionId}`);
     return response.data;
   },
 
-  // Get requests for a session
   getSessionRequests: async (sessionId) => {
     const response = await api.get(`/sessions/${sessionId}/requests`);
     return response.data;
   },
 
-  // Replay a request
   replayRequest: async (sessionId, requestId, targetUrl) => {
     const response = await api.post(`/sessions/${sessionId}/replay`, {
       request_id: requestId,
       target_url: targetUrl,
     });
+    return response.data;
+  },
+
+  // ADD THESE MISSING ENVIRONMENT METHODS:
+  getEnvironments: async () => {
+    const response = await api.get('/environments');
+    return response.data;
+  },
+
+  createEnvironment: async (environmentData) => {
+    const response = await api.post('/environments', environmentData);
+    return response.data;
+  },
+
+  updateEnvironment: async (envId, environmentData) => {
+    const response = await api.put(`/environments/${envId}`, environmentData);
+    return response.data;
+  },
+
+  deleteEnvironment: async (envId) => {
+    const response = await api.delete(`/environments/${envId}`);
+    return response.data;
+  },
+
+  // ADD THESE MISSING COLLECTION METHODS:
+  getCollections: async () => {
+    const response = await api.get('/collections');
+    return response.data;
+  },
+
+  createCollection: async (collectionData) => {
+    const response = await api.post('/collections', collectionData);
+    return response.data;
+  },
+
+  deleteCollection: async (collectionId) => {
+    const response = await api.delete(`/collections/${collectionId}`);
+    return response.data;
+  },
+
+  getCollection: async (collectionId) => {
+    const response = await api.get(`/collections/${collectionId}`);
+    return response.data;
+  },
+
+  addRequestToCollection: async (collectionId, requestData) => {
+    const response = await api.post(`/collections/${collectionId}/requests`, requestData);
+    return response.data;
+  },
+
+  executeCollectionRequest: async (collectionId, requestId) => {
+    const response = await api.post(`/collections/${collectionId}/requests/${requestId}/execute`);
     return response.data;
   },
 };
