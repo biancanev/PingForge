@@ -54,3 +54,5 @@ const Logo = (
     </div>
   );
 };
+
+export default PingForgeLogo;
