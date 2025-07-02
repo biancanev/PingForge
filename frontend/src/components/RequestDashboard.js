@@ -1,18 +1,33 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useWebSocket } from '../hooks/useWebSocket';
-import { sessionAPI } from '../services/api'; // Change from webhookAPI to sessionAPI
+import { sessionAPI } from '../services/api';
 import RequestInspector from './RequestInspector';
-import { Activity, Wifi, WifiOff, RefreshCw, ChevronDown, ChevronRight, Clock, Globe } from 'lucide-react';
+import { 
+  Activity, Wifi, WifiOff, RefreshCw, ChevronDown, ChevronRight, 
+  Clock, Globe, Filter, Search, X, Calendar 
+} from 'lucide-react';
 
 const RequestDashboard = ({ session, onRequestsUpdate }) => {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(false);
   const [expandedRequest, setExpandedRequest] = useState(null);
-  const { messages, isConnected } = useWebSocket(session?.id); // Use session.id instead of session.session_id
+  const [showFilters, setShowFilters] = useState(false);
+  
+  // Filter state
+  const [filters, setFilters] = useState({
+    search: '',
+    methods: [],
+    ips: [],
+    timeRange: 'all', // 'all', '1h', '24h', '7d'
+    dateFrom: '',
+    dateTo: ''
+  });
+
+  const { messages, isConnected } = useWebSocket(session?.id);
 
   // Load existing requests when session changes
   useEffect(() => {
-    if (session?.id) { // Change from session_id to id
+    if (session?.id) {
       loadRequests();
     } else {
       setRequests([]);
@@ -26,17 +41,85 @@ const RequestDashboard = ({ session, onRequestsUpdate }) => {
     }
   }, [messages]);
 
+  // Filter requests based on current filter state
+  const filteredRequests = useMemo(() => {
+    let filtered = [...requests];
+
+    // Text search (search in body, headers, IP)
+    if (filters.search) {
+      const searchLower = filters.search.toLowerCase();
+      filtered = filtered.filter(req =>
+        (req.body && req.body.toLowerCase().includes(searchLower)) ||
+        (req.ip_address && req.ip_address.toLowerCase().includes(searchLower)) ||
+        (req.headers && JSON.stringify(req.headers).toLowerCase().includes(searchLower))
+      );
+    }
+
+    // HTTP method filter
+    if (filters.methods.length > 0) {
+      filtered = filtered.filter(req => filters.methods.includes(req.method));
+    }
+
+    // IP address filter
+    if (filters.ips.length > 0) {
+      filtered = filtered.filter(req => filters.ips.includes(req.ip_address));
+    }
+
+    // Time range filter
+    if (filters.timeRange !== 'all') {
+      const now = new Date();
+      let cutoff;
+      
+      switch (filters.timeRange) {
+        case '1h':
+          cutoff = new Date(now.getTime() - 60 * 60 * 1000);
+          break;
+        case '24h':
+          cutoff = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+          break;
+        case '7d':
+          cutoff = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          break;
+        default:
+          cutoff = null;
+      }
+      
+      if (cutoff) {
+        filtered = filtered.filter(req => new Date(req.timestamp) >= cutoff);
+      }
+    }
+
+    // Custom date range filter
+    if (filters.dateFrom) {
+      const fromDate = new Date(filters.dateFrom);
+      filtered = filtered.filter(req => new Date(req.timestamp) >= fromDate);
+    }
+    
+    if (filters.dateTo) {
+      const toDate = new Date(filters.dateTo + 'T23:59:59');
+      filtered = filtered.filter(req => new Date(req.timestamp) <= toDate);
+    }
+
+    return filtered;
+  }, [requests, filters]);
+
+  // Get unique methods and IPs for filter options
+  const filterOptions = useMemo(() => {
+    const methods = [...new Set(requests.map(r => r.method))].sort();
+    const ips = [...new Set(requests.map(r => r.ip_address))].filter(Boolean).sort();
+    return { methods, ips };
+  }, [requests]);
+
   // Notify parent component of requests updates
   useEffect(() => {
     if (onRequestsUpdate) {
-      onRequestsUpdate(requests);
+      onRequestsUpdate(filteredRequests);
     }
-  }, [requests, onRequestsUpdate]);
+  }, [filteredRequests, onRequestsUpdate]);
 
   const loadRequests = async () => {
     setLoading(true);
     try {
-      // Use the new session API endpoint
       const data = await sessionAPI.getSessionRequests(session.id);
       setRequests(data.requests || []);
     } catch (error) {
@@ -44,6 +127,44 @@ const RequestDashboard = ({ session, onRequestsUpdate }) => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const clearAllFilters = () => {
+    setFilters({
+      search: '',
+      methods: [],
+      ips: [],
+      timeRange: 'all',
+      dateFrom: '',
+      dateTo: ''
+    });
+  };
+
+  const hasActiveFilters = () => {
+    return filters.search || 
+           filters.methods.length > 0 || 
+           filters.ips.length > 0 || 
+           filters.timeRange !== 'all' ||
+           filters.dateFrom ||
+           filters.dateTo;
+  };
+
+  const toggleMethodFilter = (method) => {
+    setFilters(prev => ({
+      ...prev,
+      methods: prev.methods.includes(method)
+        ? prev.methods.filter(m => m !== method)
+        : [...prev.methods, method]
+    }));
+  };
+
+  const toggleIpFilter = (ip) => {
+    setFilters(prev => ({
+      ...prev,
+      ips: prev.ips.includes(ip)
+        ? prev.ips.filter(i => i !== ip)
+        : [...prev.ips, ip]
+    }));
   };
 
   const formatTime = (timestamp) => {
@@ -116,8 +237,27 @@ const RequestDashboard = ({ session, onRequestsUpdate }) => {
 
           <div className="flex items-center space-x-4">
             <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
-              {requests.length} request{requests.length !== 1 ? 's' : ''}
+              {filteredRequests.length} of {requests.length} request{requests.length !== 1 ? 's' : ''}
             </span>
+            
+            <button 
+              onClick={() => setShowFilters(!showFilters)}
+              className={`flex items-center space-x-2 px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
+                hasActiveFilters() 
+                  ? 'bg-blue-100 text-blue-700 border border-blue-200' 
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              <Filter size={16} />
+              <span>Filter</span>
+              {hasActiveFilters() && (
+                <span className="bg-blue-500 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center">
+                  {[filters.methods.length, filters.ips.length, filters.search ? 1 : 0, 
+                    filters.timeRange !== 'all' ? 1 : 0, filters.dateFrom ? 1 : 0, filters.dateTo ? 1 : 0]
+                    .reduce((a, b) => a + b, 0)}
+                </span>
+              )}
+            </button>
             
             <button 
               onClick={loadRequests}
@@ -128,6 +268,138 @@ const RequestDashboard = ({ session, onRequestsUpdate }) => {
             </button>
           </div>
         </div>
+
+        {/* Filter Panel */}
+        {showFilters && (
+          <div className="mt-4 p-4 bg-white rounded-lg border border-gray-200">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              {/* Search */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Search in requests
+                </label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
+                  <input
+                    type="text"
+                    placeholder="Search body, headers, IP..."
+                    value={filters.search}
+                    onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+              </div>
+
+              {/* Time Range */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Time Range
+                </label>
+                <select
+                  value={filters.timeRange}
+                  onChange={(e) => setFilters(prev => ({ ...prev, timeRange: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="all">All time</option>
+                  <option value="1h">Last hour</option>
+                  <option value="24h">Last 24 hours</option>
+                  <option value="7d">Last 7 days</option>
+                </select>
+              </div>
+
+              {/* Custom Date Range */}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    From Date
+                  </label>
+                  <input
+                    type="date"
+                    value={filters.dateFrom}
+                    onChange={(e) => setFilters(prev => ({ ...prev, dateFrom: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    To Date
+                  </label>
+                  <input
+                    type="date"
+                    value={filters.dateTo}
+                    onChange={(e) => setFilters(prev => ({ ...prev, dateTo: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Method and IP Filters */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
+              {/* HTTP Methods */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  HTTP Methods ({filters.methods.length} selected)
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {filterOptions.methods.map(method => (
+                    <button
+                      key={method}
+                      onClick={() => toggleMethodFilter(method)}
+                      className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
+                        filters.methods.includes(method)
+                          ? `${getMethodStyle(method)} ring-2 ring-blue-500`
+                          : `${getMethodStyle(method)} hover:ring-2 hover:ring-gray-300`
+                      }`}
+                    >
+                      {method}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* IP Addresses */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Source IPs ({filters.ips.length} selected)
+                </label>
+                <div className="max-h-24 overflow-y-auto">
+                  <div className="flex flex-wrap gap-2">
+                    {filterOptions.ips.map(ip => (
+                      <button
+                        key={ip}
+                        onClick={() => toggleIpFilter(ip)}
+                        className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
+                          filters.ips.includes(ip)
+                            ? 'bg-blue-100 text-blue-800 ring-2 ring-blue-500'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        {ip}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Filter Actions */}
+            <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-200">
+              <div className="text-sm text-gray-600">
+                Showing {filteredRequests.length} of {requests.length} requests
+              </div>
+              {hasActiveFilters() && (
+                <button
+                  onClick={clearAllFilters}
+                  className="flex items-center space-x-2 px-3 py-1 text-sm text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                >
+                  <X size={16} />
+                  <span>Clear all filters</span>
+                </button>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Content */}
@@ -139,22 +411,27 @@ const RequestDashboard = ({ session, onRequestsUpdate }) => {
               <p className="text-gray-600">Loading requests...</p>
             </div>
           </div>
-        ) : requests.length === 0 ? (
+        ) : filteredRequests.length === 0 ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
               <Activity className="mx-auto mb-4 text-gray-400" size={48} />
               <h4 className="text-lg font-medium text-gray-900 mb-2">
-                Waiting for requests...
+                {requests.length === 0 ? 'Waiting for requests...' : 'No requests match filters'}
               </h4>
               <p className="text-gray-600 mb-4">
-                Send a request to your webhook URL to see it appear here
+                {requests.length === 0 
+                  ? 'Send a request to your webhook URL to see it appear here'
+                  : 'Try adjusting your filters to see more results'
+                }
               </p>
-              <div className="bg-gray-50 rounded-lg p-4 max-w-md">
-                <p className="text-sm text-gray-700 mb-2">Try this PowerShell command:</p>
-                <code className="text-xs bg-gray-800 text-green-400 p-2 rounded block break-all">
-                  Invoke-RestMethod -Uri "http://pingforge.onrender.com{session.webhook_url}" -Method Post -Body '{`{"test": "data"}`}' -Headers @{`{"Content-Type"="application/json"`}
-                </code>
-              </div>
+              {requests.length === 0 && (
+                <div className="bg-gray-50 rounded-lg p-4 max-w-md mx-auto">
+                  <p className="text-sm text-gray-700 mb-2">Try this PowerShell command:</p>
+                  <code className="text-xs bg-gray-800 text-green-400 p-2 rounded block break-all">
+                    Invoke-RestMethod -Uri "http://pingforge.onrender.com{session.webhook_url}" -Method Post -Body '{`{"test": "data"}`}' -Headers @{`{"Content-Type"="application/json"`}
+                  </code>
+                </div>
+              )}
             </div>
           </div>
         ) : (
@@ -172,7 +449,7 @@ const RequestDashboard = ({ session, onRequestsUpdate }) => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {requests.map((request, index) => (
+                {filteredRequests.map((request, index) => (
                   <React.Fragment key={request.id || index}>
                     <tr 
                       className="hover:bg-gray-50 cursor-pointer transition-colors"
@@ -180,7 +457,7 @@ const RequestDashboard = ({ session, onRequestsUpdate }) => {
                     >
                       <td className="py-3 px-4">
                         <button className="text-gray-400 hover:text-gray-600">
-                          {expandedRequest === request.id ? 
+                          {expandedRequest === request.id ?
                             <ChevronDown size={16} /> : 
                             <ChevronRight size={16} />
                           }
@@ -228,7 +505,7 @@ const RequestDashboard = ({ session, onRequestsUpdate }) => {
                         <td colSpan="6" className="bg-gray-50">
                           <RequestInspector 
                             request={request} 
-                            sessionId={session.id} // Use session.id instead of session.session_id
+                            sessionId={session.id}
                           />
                         </td>
                       </tr>
