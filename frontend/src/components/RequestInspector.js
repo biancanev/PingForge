@@ -54,6 +54,8 @@ const RequestInspector = ({ request, sessionId }) => {
     'https://pingforge.onrender.com/webhook'
   ];
 
+  const { maskIP } = useIPMasking();
+
   // Rest of your component stays the same...
   return (
     <div className="p-6 space-y-6 bg-white border-t border-gray-200">
@@ -82,7 +84,17 @@ const RequestInspector = ({ request, sessionId }) => {
         </div>
         <div>
           <span className="text-gray-600 block">Source IP</span>
-          <span className="text-gray-900">{request.ip_address || 'unknown'}</span>
+          <div className="flex items-center space-x-2">
+            <span className="text-gray-900">{maskIP(request.ip_address || 'unknown')}</span>
+            <button 
+              onClick={() => copyToClipboard(request.ip_address || 'unknown', 'ip')}
+              className="text-gray-400 hover:text-gray-600"
+              title="Copy original IP"
+            >
+              <Copy size={12} />
+            </button>
+            {copiedField === 'ip' && <span className="text-green-600 text-xs">Copied!</span>}
+          </div>
         </div>
       </div>
 

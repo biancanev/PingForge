@@ -1,10 +1,14 @@
 import React, { useState } from 'react';
 import Header from '../components/Header';
-import WebhookCreator from '../components/WebhookCreator';
+//import WebhookCreator from '../components/WebhookCreator';
 import RequestDashboard from '../components/RequestDashboard';
 import AnalyticsDashboard from '../components/AnalyticsDashboard';
 import SessionStats from '../components/SessionStats';
+import IPMaskingSettings from '../components/IPMaskingSettings';
+import { useIPMasking } from '../hooks/useIPMasking';
 import { BarChart3, List, Settings, ArrowLeft } from 'lucide-react';
+
+const { maskingEnabled, maskingLevel, setMaskingLevel, toggleMasking } = useIPMasking();
 
 const ActiveSession = ({ session, onSessionCreated, onBack }) => {
   const [activeTab, setActiveTab] = useState('requests');
@@ -153,6 +157,17 @@ const ActiveSession = ({ session, onSessionCreated, onBack }) => {
                 <p className="text-sm text-gray-500">
                   Session settings are currently read-only. Contact support to modify session details.
                 </p>
+              </div>
+              {/* New IP Masking Settings */}
+              <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
+                <h2 className="text-xl font-semibold text-gray-900 mb-4">Privacy Settings</h2>
+                <IPMaskingSettings
+                  maskingEnabled={maskingEnabled}
+                  maskingLevel={maskingLevel}
+                  onToggleMasking={toggleMasking}
+                  onMaskingLevelChange={setMaskingLevel}
+                  showInline={false}
+                />
               </div>
             </div>
           )}

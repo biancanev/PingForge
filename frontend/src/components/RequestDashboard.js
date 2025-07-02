@@ -2,9 +2,11 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { sessionAPI } from '../services/api';
 import RequestInspector from './RequestInspector';
+import IPMaskingSettings from './IPMaskingSettings';
+import { useIPMasking } from '../hooks/useIPMasking';
 import { 
   Activity, Wifi, WifiOff, RefreshCw, ChevronDown, ChevronRight, 
-  Clock, Globe, Filter, Search, X, Calendar 
+  Clock, Globe, Filter, Search, X, Calendar, EyeOff 
 } from 'lucide-react';
 
 const RequestDashboard = ({ session, onRequestsUpdate }) => {
@@ -22,6 +24,9 @@ const RequestDashboard = ({ session, onRequestsUpdate }) => {
     dateFrom: '',
     dateTo: ''
   });
+
+  // IP Masking hook
+  const { maskingEnabled, maskingLevel, setMaskingLevel, maskIP, toggleMasking } = useIPMasking();
 
   const { messages, isConnected } = useWebSocket(session?.id);
 
@@ -60,7 +65,7 @@ const RequestDashboard = ({ session, onRequestsUpdate }) => {
       filtered = filtered.filter(req => filters.methods.includes(req.method));
     }
 
-    // IP address filter
+    // IP address filter (use original IPs for filtering)
     if (filters.ips.length > 0) {
       filtered = filtered.filter(req => filters.ips.includes(req.ip_address));
     }
@@ -103,12 +108,20 @@ const RequestDashboard = ({ session, onRequestsUpdate }) => {
     return filtered;
   }, [requests, filters]);
 
-  // Get unique methods and IPs for filter options
+  // Get unique methods and IPs for filter options (considering masking)
   const filterOptions = useMemo(() => {
     const methods = [...new Set(requests.map(r => r.method))].sort();
-    const ips = [...new Set(requests.map(r => r.ip_address))].filter(Boolean).sort();
+    const uniqueIPs = [...new Set(requests.map(r => r.ip_address))].filter(Boolean);
+    
+    // Create IP objects with both original and masked versions
+    const ips = uniqueIPs.map(ip => ({
+      original: ip,
+      display: maskIP(ip),
+      isMasked: maskingEnabled
+    })).sort((a, b) => a.display.localeCompare(b.display));
+    
     return { methods, ips };
-  }, [requests]);
+  }, [requests, maskingEnabled, maskingLevel, maskIP]);
 
   // Notify parent component of requests updates
   useEffect(() => {
@@ -149,6 +162,16 @@ const RequestDashboard = ({ session, onRequestsUpdate }) => {
            filters.dateTo;
   };
 
+  const getActiveFilterCount = () => {
+    let count = 0;
+    if (filters.search) count++;
+    if (filters.methods.length > 0) count++;
+    if (filters.ips.length > 0) count++;
+    if (filters.timeRange !== 'all') count++;
+    if (filters.dateFrom || filters.dateTo) count++;
+    return count;
+  };
+
   const toggleMethodFilter = (method) => {
     setFilters(prev => ({
       ...prev,
@@ -158,12 +181,12 @@ const RequestDashboard = ({ session, onRequestsUpdate }) => {
     }));
   };
 
-  const toggleIpFilter = (ip) => {
+  const toggleIpFilter = (originalIp) => {
     setFilters(prev => ({
       ...prev,
-      ips: prev.ips.includes(ip)
-        ? prev.ips.filter(i => i !== ip)
-        : [...prev.ips, ip]
+      ips: prev.ips.includes(originalIp)
+        ? prev.ips.filter(i => i !== originalIp)
+        : [...prev.ips, originalIp]
     }));
   };
 
@@ -239,6 +262,15 @@ const RequestDashboard = ({ session, onRequestsUpdate }) => {
             <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
               {filteredRequests.length} of {requests.length} request{requests.length !== 1 ? 's' : ''}
             </span>
+
+            {/* IP Masking Controls */}
+            <IPMaskingSettings
+              maskingEnabled={maskingEnabled}
+              maskingLevel={maskingLevel}
+              onToggleMasking={toggleMasking}
+              onMaskingLevelChange={setMaskingLevel}
+              showInline={true}
+            />
             
             <button 
               onClick={() => setShowFilters(!showFilters)}
@@ -252,9 +284,7 @@ const RequestDashboard = ({ session, onRequestsUpdate }) => {
               <span>Filter</span>
               {hasActiveFilters() && (
                 <span className="bg-blue-500 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center">
-                  {[filters.methods.length, filters.ips.length, filters.search ? 1 : 0, 
-                    filters.timeRange !== 'all' ? 1 : 0, filters.dateFrom ? 1 : 0, filters.dateTo ? 1 : 0]
-                    .reduce((a, b) => a + b, 0)}
+                  {getActiveFilterCount()}
                 </span>
               )}
             </button>
@@ -262,7 +292,8 @@ const RequestDashboard = ({ session, onRequestsUpdate }) => {
             <button 
               onClick={loadRequests}
               disabled={loading}
-              className="text-gray-500 hover:text-gray-700 p-1 rounded"
+              className="text-gray-500 hover:text-gray-700 p-1 rounded transition-colors"
+              title="Refresh requests"
             >
               <RefreshCw className={loading ? 'animate-spin' : ''} size={16} />
             </button>
@@ -285,8 +316,16 @@ const RequestDashboard = ({ session, onRequestsUpdate }) => {
                     placeholder="Search body, headers, IP..."
                     value={filters.search}
                     onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                   />
+                  {filters.search && (
+                    <button
+                      onClick={() => setFilters(prev => ({ ...prev, search: '' }))}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      <X size={16} />
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -298,7 +337,7 @@ const RequestDashboard = ({ session, onRequestsUpdate }) => {
                 <select
                   value={filters.timeRange}
                   onChange={(e) => setFilters(prev => ({ ...prev, timeRange: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                 >
                   <option value="all">All time</option>
                   <option value="1h">Last hour</option>
@@ -317,7 +356,7 @@ const RequestDashboard = ({ session, onRequestsUpdate }) => {
                     type="date"
                     value={filters.dateFrom}
                     onChange={(e) => setFilters(prev => ({ ...prev, dateFrom: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                   />
                 </div>
                 <div>
@@ -328,7 +367,7 @@ const RequestDashboard = ({ session, onRequestsUpdate }) => {
                     type="date"
                     value={filters.dateTo}
                     onChange={(e) => setFilters(prev => ({ ...prev, dateTo: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                   />
                 </div>
               </div>
@@ -346,15 +385,18 @@ const RequestDashboard = ({ session, onRequestsUpdate }) => {
                     <button
                       key={method}
                       onClick={() => toggleMethodFilter(method)}
-                      className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
+                      className={`px-3 py-1 rounded-lg text-sm font-medium transition-all ${
                         filters.methods.includes(method)
-                          ? `${getMethodStyle(method)} ring-2 ring-blue-500`
+                          ? `${getMethodStyle(method)} ring-2 ring-blue-500 ring-opacity-50`
                           : `${getMethodStyle(method)} hover:ring-2 hover:ring-gray-300`
                       }`}
                     >
                       {method}
                     </button>
                   ))}
+                  {filterOptions.methods.length === 0 && (
+                    <span className="text-sm text-gray-500 italic">No methods captured yet</span>
+                  )}
                 </div>
               </div>
 
@@ -365,19 +407,24 @@ const RequestDashboard = ({ session, onRequestsUpdate }) => {
                 </label>
                 <div className="max-h-24 overflow-y-auto">
                   <div className="flex flex-wrap gap-2">
-                    {filterOptions.ips.map(ip => (
+                    {filterOptions.ips.map(ipObj => (
                       <button
-                        key={ip}
-                        onClick={() => toggleIpFilter(ip)}
-                        className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
-                          filters.ips.includes(ip)
-                            ? 'bg-blue-100 text-blue-800 ring-2 ring-blue-500'
+                        key={ipObj.original}
+                        onClick={() => toggleIpFilter(ipObj.original)}
+                        className={`flex items-center space-x-1 px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
+                          filters.ips.includes(ipObj.original)
+                            ? 'bg-blue-100 text-blue-800 ring-2 ring-blue-500 ring-opacity-50'
                             : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                         }`}
+                        title={ipObj.isMasked ? `Original: ${ipObj.original}` : ipObj.original}
                       >
-                        {ip}
+                        <span className={ipObj.isMasked ? 'font-mono' : ''}>{ipObj.display}</span>
+                        {ipObj.isMasked && <EyeOff size={12} />}
                       </button>
                     ))}
+                    {filterOptions.ips.length === 0 && (
+                      <span className="text-sm text-gray-500 italic">No IPs captured yet</span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -387,6 +434,9 @@ const RequestDashboard = ({ session, onRequestsUpdate }) => {
             <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-200">
               <div className="text-sm text-gray-600">
                 Showing {filteredRequests.length} of {requests.length} requests
+                {hasActiveFilters() && (
+                  <span className="ml-2 text-blue-600">• {getActiveFilterCount()} filter{getActiveFilterCount() !== 1 ? 's' : ''} active</span>
+                )}
               </div>
               {hasActiveFilters() && (
                 <button
@@ -427,10 +477,18 @@ const RequestDashboard = ({ session, onRequestsUpdate }) => {
               {requests.length === 0 && (
                 <div className="bg-gray-50 rounded-lg p-4 max-w-md mx-auto">
                   <p className="text-sm text-gray-700 mb-2">Try this PowerShell command:</p>
-                  <code className="text-xs bg-gray-800 text-green-400 p-2 rounded block break-all">
+                  <code className="text-xs bg-gray-800 text-green-400 p-2 rounded block break-all font-mono">
                     Invoke-RestMethod -Uri "http://pingforge.onrender.com{session.webhook_url}" -Method Post -Body '{`{"test": "data"}`}' -Headers @{`{"Content-Type"="application/json"`}
                   </code>
                 </div>
+              )}
+              {hasActiveFilters() && requests.length > 0 && (
+                <button
+                  onClick={clearAllFilters}
+                  className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  Clear Filters
+                </button>
               )}
             </div>
           </div>
@@ -438,12 +496,17 @@ const RequestDashboard = ({ session, onRequestsUpdate }) => {
           /* Table Layout */
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-200">
+              <thead className="bg-gray-50 border-b border-gray-200 sticky top-0">
                 <tr>
                   <th className="text-left py-3 px-4 font-medium text-gray-700 w-4"></th>
                   <th className="text-left py-3 px-4 font-medium text-gray-700 w-20">Method</th>
                   <th className="text-left py-3 px-4 font-medium text-gray-700 w-32">Time</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-700 w-32">Source IP</th>
+                  <th className="text-left py-3 px-4 font-medium text-gray-700 w-32">
+                    <div className="flex items-center space-x-1">
+                      <span>Source IP</span>
+                      {maskingEnabled && <EyeOff size={12} className="text-gray-400" />}
+                    </div>
+                  </th>
                   <th className="text-left py-3 px-4 font-medium text-gray-700">Body Preview</th>
                   <th className="text-left py-3 px-4 font-medium text-gray-700 w-24">Headers</th>
                 </tr>
@@ -456,7 +519,7 @@ const RequestDashboard = ({ session, onRequestsUpdate }) => {
                       onClick={() => toggleExpanded(request.id)}
                     >
                       <td className="py-3 px-4">
-                        <button className="text-gray-400 hover:text-gray-600">
+                        <button className="text-gray-400 hover:text-gray-600 transition-colors">
                           {expandedRequest === request.id ?
                             <ChevronDown size={16} /> : 
                             <ChevronRight size={16} />
@@ -483,12 +546,17 @@ const RequestDashboard = ({ session, onRequestsUpdate }) => {
                       <td className="py-3 px-4 text-sm text-gray-600">
                         <div className="flex items-center space-x-1">
                           <Globe size={12} />
-                          <span>{request.ip_address || 'unknown'}</span>
+                          <span className={`${maskingEnabled ? 'font-mono' : ''}`}>
+                            {maskIP(request.ip_address || 'unknown')}
+                          </span>
+                          {maskingEnabled && (
+                            <EyeOff size={12} className="text-gray-400" title="IP masked for privacy" />
+                          )}
                         </div>
                       </td>
                       
                       <td className="py-3 px-4 text-sm text-gray-900">
-                        <div className="font-mono text-xs bg-gray-100 rounded px-2 py-1">
+                        <div className="font-mono text-xs bg-gray-100 rounded px-2 py-1 max-w-xs">
                           {truncateText(request.body)}
                         </div>
                       </td>
@@ -502,7 +570,7 @@ const RequestDashboard = ({ session, onRequestsUpdate }) => {
                     
                     {expandedRequest === request.id && (
                       <tr>
-                        <td colSpan="6" className="bg-gray-50">
+                        <td colSpan="6" className="bg-gray-50 p-0">
                           <RequestInspector 
                             request={request} 
                             sessionId={session.id}
