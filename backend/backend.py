@@ -23,7 +23,14 @@ app.add_middleware(
 )
 
 redis_url = os.getenv('UPSTASH_REDIS_URL', 'redis://localhost:6379')
-redis_client = redis.from_url(redis_url)
+
+if 'upstash.io' in redis_url:
+    # Upstash requires SSL - use rediss:// instead of redis://
+    redis_url = redis_url.replace('redis://', 'rediss://')
+    redis_client = redis.from_url(redis_url, ssl_cert_reqs=None)
+else:
+    # Local development
+    redis_client = redis.from_url(redis_url)
 security = HTTPBearer()
 
 # WebSocket connection manager
