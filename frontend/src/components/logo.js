@@ -1,6 +1,6 @@
 import React from 'react';
 
-const Logo = (
+const PingForgeLogo = (
     variant = 'full', // 'full', 'icon', 'text'
     size = 'md', // 'sm', 'md', 'lg', 'xl'
     animated = true,
