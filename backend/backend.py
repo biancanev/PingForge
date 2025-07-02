@@ -18,7 +18,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000",
                    "https://pingforge.onrender.com",
-                    "https://pingforge.pages.dev"
+                    "https://*.pingforge.pages.dev"
                    ],
     allow_credentials=True,
     allow_methods=["*"],
