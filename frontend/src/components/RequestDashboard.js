@@ -152,7 +152,7 @@ const RequestDashboard = ({ session, onRequestsUpdate }) => {
               <div className="bg-gray-50 rounded-lg p-4 max-w-md">
                 <p className="text-sm text-gray-700 mb-2">Try this PowerShell command:</p>
                 <code className="text-xs bg-gray-800 text-green-400 p-2 rounded block break-all">
-                  Invoke-RestMethod -Uri "http://127.0.0.1:8000{session.webhook_url}" -Method Post -Body '{`{"test": "data"}`}' -Headers @{`{"Content-Type"="application/json"`}
+                  Invoke-RestMethod -Uri "http://pingforge.onrender.com{session.webhook_url}" -Method Post -Body '{`{"test": "data"}`}' -Headers @{`{"Content-Type"="application/json"`}
                 </code>
               </div>
             </div>
