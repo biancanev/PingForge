@@ -446,6 +446,6 @@ const CreateSessionModal = ({ onClose, onCreate }) => {
       </div>
     </div>
   );
-};
+}; 
 
 export default SessionsDashboard;
