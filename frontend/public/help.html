@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="/favicon.ico" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#000000" />
+    <meta name="description" content="PingForge Help & Documentation" />
+    <title>Help - PingForge</title>
+    
+    <!-- Include Tailwind CSS from CDN since your React app uses it -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Optional: Include Lucide icons from CDN -->
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+</head>
+<body class="bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-100 min-h-screen">
+    <!-- Header (simplified version of your React header) -->
+    <header class="bg-white shadow-sm border-b border-gray-200">
+        <div class="container mx-auto px-4 py-6">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-6">
+                    <div class="flex items-center space-x-3">
+                        <div class="bg-gradient-to-r from-blue-600 to-purple-600 p-2 rounded-lg">
+                            <i data-lucide="activity" class="text-white w-6 h-6"></i>
+                        </div>
+                        <div>
+                            <h1 class="text-2xl font-bold text-gray-900">PingForge</h1>
+                            <p class="text-gray-600 text-sm">Real-time API inspection and testing</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="flex items-center space-x-4">
+                    <a href="/" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+                        Back to App
+                    </a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="container mx-auto px-4 py-8">
+        <div class="max-w-4xl mx-auto">
+            <a href="/" class="flex items-center space-x-2 text-blue-600 hover:text-blue-700 text-sm font-medium mb-6 inline-flex">
+                <i data-lucide="arrow-left" class="w-4 h-4"></i>
+                <span>Back to Dashboard</span>
+            </a>
+
+            <h1 class="text-3xl font-bold text-gray-900 mb-8">Help & Documentation</h1>
+            
+            <div class="grid md:grid-cols-2 gap-8 mb-12">
+                <!-- Getting Started -->
+                <div class="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
+                    <i data-lucide="message-circle" class="text-blue-600 mb-4 w-8 h-8"></i>
+                    <h2 class="text-xl font-semibold mb-4">Getting Started</h2>
+                    <p class="text-gray-600 mb-4">Learn how to create and monitor webhook endpoints in real-time.</p>
+                    <ul class="text-sm text-gray-600 space-y-2">
+                        <li>• Create a new webhook session</li>
+                        <li>• Copy your unique webhook URL</li>
+                        <li>• Configure your service to send webhooks</li>
+                        <li>• Monitor requests in real-time</li>
+                    </ul>
+                </div>
+                
+                <!-- API Documentation -->
+                <div class="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
+                    <i data-lucide="book" class="text-green-600 mb-4 w-8 h-8"></i>
+                    <h2 class="text-xl font-semibold mb-4">API Documentation</h2>
+                    <p class="text-gray-600 mb-4">Complete API reference and testing guides for developers.</p>
+                    <ul class="text-sm text-gray-600 space-y-2">
+                        <li>• REST API endpoints</li>
+                        <li>• Authentication methods</li>
+                        <li>• Request/response examples</li>
+                        <li>• Rate limiting information</li>
+                    </ul>
+                </div>
+
+                <!-- Code Examples -->
+                <div class="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
+                    <i data-lucide="code-2" class="text-purple-600 mb-4 w-8 h-8"></i>
+                    <h2 class="text-xl font-semibold mb-4">Code Examples</h2>
+                    <p class="text-gray-600 mb-4">Ready-to-use code snippets for popular programming languages.</p>
+                    <ul class="text-sm text-gray-600 space-y-2">
+                        <li>• Python requests</li>
+                        <li>• JavaScript fetch</li>
+                        <li>• cURL commands</li>
+                        <li>• PowerShell examples</li>
+                    </ul>
+
+                    <div class="mt-4 bg-gray-900 rounded-lg p-4">
+                        <p class="text-gray-300 text-xs mb-2">Example: Send a test webhook</p>
+                        <code class="text-green-400 text-xs font-mono">
+curl -X POST https://pingforge.pages.dev/hooks/abc123 \<br>
+&nbsp;&nbsp;-H "Content-Type: application/json" \<br>
+&nbsp;&nbsp;-d '{"test": "data", "timestamp": "2025-07-02T10:30:00Z"}'
+                        </code>
+                    </div>
+                </div>
+
+                <!-- Troubleshooting -->
+                <div class="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
+                    <i data-lucide="zap" class="text-orange-600 mb-4 w-8 h-8"></i>
+                    <h2 class="text-xl font-semibold mb-4">Troubleshooting</h2>
+                    <p class="text-gray-600 mb-4">Common issues and solutions for webhook debugging.</p>
+                    <ul class="text-sm text-gray-600 space-y-2">
+                        <li>• Connection timeouts</li>
+                        <li>• SSL certificate issues</li>
+                        <li>• Authentication problems</li>
+                        <li>• Rate limiting errors</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- FAQ Section -->
+            <div class="bg-white rounded-xl shadow-lg border border-gray-200 p-6 mb-8">
+                <h2 class="text-xl font-semibold mb-6">Frequently Asked Questions</h2>
+                
+                <div class="space-y-6">
+                    <div>
+                        <h3 class="font-medium text-gray-900 mb-2">How long do webhook sessions last?</h3>
+                        <p class="text-gray-600 text-sm">Webhook sessions are active for 24 hours by default. You can create new sessions anytime.</p>
+                    </div>
+                    
+                    <div>
+                        <h3 class="font-medium text-gray-900 mb-2">Is there a limit on the number of requests?</h3>
+                        <p class="text-gray-600 text-sm">Free accounts can receive up to 1000 requests per session. Authenticated users get higher limits.</p>
+                    </div>
+                    
+                    <div>
+                        <h3 class="font-medium text-gray-900 mb-2">Can I replay captured requests?</h3>
+                        <p class="text-gray-600 text-sm">Yes! You can forward any captured request to your actual endpoints for testing purposes.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Contact Support -->
+            <div class="bg-blue-50 rounded-xl p-6 border border-blue-200">
+                <div class="flex items-center space-x-4">
+                    <i data-lucide="mail" class="text-blue-600 w-6 h-6"></i>
+                    <div>
+                        <h3 class="font-semibold text-gray-900">Need more help?</h3>
+                        <p class="text-gray-600 text-sm">Contact our support team for personalized assistance.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Initialize Lucide icons -->
+    <script>
+        lucide.createIcons();
+    </script>
+</body>
+</html>
