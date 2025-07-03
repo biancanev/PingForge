@@ -9,6 +9,10 @@ const Header = ({ currentSession }) => {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
 
+  const navigateToHelp = () => {
+    window.location.href = '/help';
+  };
+
   const handleAuthSuccess = () => {
     setShowAuthModal(false);
     // Optionally refresh the page or update state
@@ -31,6 +35,15 @@ const Header = ({ currentSession }) => {
                 <p className="text-gray-600 text-sm">Real-time API inspection and testing</p>
               </div>
             </div>
+            
+            <button
+              onClick={navigateToHelp}
+              className="flex items-center space-x-2 text-gray-600 hover:text-blue-600 transition-colors duration-200 px-3 py-2 rounded-lg hover:bg-blue-50"
+              title="Help & Documentation"
+            >
+              <HelpCircle size={20} />
+              <span className="text-sm font-medium">Help</span>
+            </button>
             
             <div className="flex items-center space-x-4">
               {/* Session Status */}
