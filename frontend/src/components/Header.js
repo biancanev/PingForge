@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Activity, User, LogOut, Settings } from 'lucide-react';
+import { Activity, User, LogOut, Settings, HelpCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import AuthModal from './AuthModal';
 import PingForgeLogo from './logo';
