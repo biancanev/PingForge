@@ -144,7 +144,7 @@ const APITesting = ({ onBack }) => {
             {/* Panel Content */}
             <div className="flex-1 overflow-hidden">
               {activePanel === 'collections' && (
-                <CollectionsPanel
+                <CollectionsPanel 
                   onRequestSelect={handleRequestFromCollection}
                   selectedEnvironment={selectedEnvironment}
                 />
@@ -217,8 +217,27 @@ const APITesting = ({ onBack }) => {
           <SaveRequestModal
             onClose={() => setShowSaveModal(false)}
             onSave={async (saveData) => {
-              // Handle saving request to collection
               try {
+                // Convert the HTTPClient request format to the backend format
+                const requestDataForBackend = {
+                  method: currentRequest.method,
+                  url: currentRequest.url,
+                  headers: currentRequest.headers.reduce((acc, header) => {
+                    if (header.enabled && header.key && header.value) {
+                      acc[header.key] = header.value;
+                    }
+                    return acc;
+                  }, {}),
+                  params: currentRequest.params.reduce((acc, param) => {
+                    if (param.enabled && param.key && param.value) {
+                      acc[param.key] = param.value;
+                    }
+                    return acc;
+                  }, {}),
+                  body: currentRequest.body,
+                  auth: currentRequest.auth
+                };
+
                 if (saveData.newCollection) {
                   // Create new collection first
                   const collection = await sessionAPI.createCollection({
@@ -231,14 +250,14 @@ const APITesting = ({ onBack }) => {
                   await sessionAPI.addRequestToCollection(collection.id, {
                     name: saveData.requestName,
                     description: saveData.requestDescription,
-                    request_data: currentRequest
+                    request_data: requestDataForBackend
                   });
                 } else {
                   // Add to existing collection
                   await sessionAPI.addRequestToCollection(saveData.collectionId, {
                     name: saveData.requestName,
                     description: saveData.requestDescription,
-                    request_data: currentRequest
+                    request_data: requestDataForBackend
                   });
                 }
                 
@@ -287,7 +306,7 @@ const EnhancedHTTPClient = ({ initialRequest, selectedEnvironment, onRequestChan
   );
 };
 
-// Save Request Modal Component
+// Complete SaveRequestModal Component
 const SaveRequestModal = ({ onClose, onSave, currentRequest, selectedEnvironment }) => {
   const [collections, setCollections] = useState([]);
   const [formData, setFormData] = useState({
@@ -360,71 +379,78 @@ const SaveRequestModal = ({ onClose, onSave, currentRequest, selectedEnvironment
             />
           </div>
 
+          {/* Collection Selection */}
           <div className="space-y-3">
-            <div className="flex items-center space-x-3">
-              <input
-                type="radio"
-                id="existing"
-                checked={!formData.newCollection}
-                onChange={() => setFormData(prev => ({ ...prev, newCollection: false }))}
-              />
-              <label htmlFor="existing" className="text-sm font-medium text-gray-700">
-                Add to existing collection
-              </label>
-            </div>
+            <label className="block text-sm font-medium text-gray-700">Collection *</label>
             
-            {!formData.newCollection && (
-              <select
-                value={formData.collectionId}
-                onChange={(e) => setFormData(prev => ({ ...prev, collectionId: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                required={!formData.newCollection}
-              >
-                <option value="">Select a collection</option>
-                {collections.map((collection) => (
-                  <option key={collection.id} value={collection.id}>
-                    {collection.name}
-                  </option>
-                ))}
-              </select>
-            )}
-
-            <div className="flex items-center space-x-3">
+            {/* New Collection Option */}
+            <div className="flex items-center space-x-2">
               <input
                 type="radio"
-                id="new"
+                id="new-collection"
+                name="collection-option"
                 checked={formData.newCollection}
-                onChange={() => setFormData(prev => ({ ...prev, newCollection: true }))}
+                onChange={(e) => setFormData(prev => ({ ...prev, newCollection: e.target.checked, collectionId: '' }))}
+                className="text-blue-600 focus:ring-blue-500"
               />
-              <label htmlFor="new" className="text-sm font-medium text-gray-700">
-                Create new collection
-              </label>
+              <label htmlFor="new-collection" className="text-sm text-gray-700">Create new collection</label>
             </div>
-            
+
             {formData.newCollection && (
-              <div className="space-y-2 ml-6">
+              <div className="ml-6 space-y-2">
                 <input
                   type="text"
+                  required
                   value={formData.collectionName}
                   onChange={(e) => setFormData(prev => ({ ...prev, collectionName: e.target.value }))}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                   placeholder="Collection name"
-                  required={formData.newCollection}
                 />
-                <textarea
+                <input
+                  type="text"
                   value={formData.collectionDescription}
                   onChange={(e) => setFormData(prev => ({ ...prev, collectionDescription: e.target.value }))}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                  rows="2"
                   placeholder="Collection description (optional)"
                 />
+              </div>
+            )}
+
+            {/* Existing Collection Option */}
+            <div className="flex items-center space-x-2">
+              <input
+                type="radio"
+                id="existing-collection"
+                name="collection-option"
+                checked={!formData.newCollection}
+                onChange={(e) => setFormData(prev => ({ ...prev, newCollection: !e.target.checked }))}
+                className="text-blue-600 focus:ring-blue-500"
+              />
+              <label htmlFor="existing-collection" className="text-sm text-gray-700">Add to existing collection</label>
+            </div>
+
+            {!formData.newCollection && (
+              <div className="ml-6">
+                <select
+                  required
+                  value={formData.collectionId}
+                  onChange={(e) => setFormData(prev => ({ ...prev, collectionId: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                >
+                  <option value="">Select a collection</option>
+                  {collections.map(collection => (
+                    <option key={collection.id} value={collection.id}>
+                      {collection.name}
+                    </option>
+                  ))}
+                </select>
               </div>
             )}
           </div>
 
           {selectedEnvironment && (
-            <div className="text-sm text-gray-600 bg-green-50 p-3 rounded-lg">
-              <strong>Environment:</strong> {selectedEnvironment.name} will be linked to this collection
+            <div className="text-sm text-gray-600 bg-blue-50 p-3 rounded-lg">
+              <strong>Environment:</strong> {selectedEnvironment.name}
             </div>
           )}
           
@@ -438,7 +464,7 @@ const SaveRequestModal = ({ onClose, onSave, currentRequest, selectedEnvironment
             </button>
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || !formData.requestName.trim()}
               className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg transition-colors disabled:cursor-not-allowed"
             >
               {loading ? 'Saving...' : 'Save Request'}
