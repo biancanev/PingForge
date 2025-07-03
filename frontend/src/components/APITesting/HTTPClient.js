@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Send, Save, Folder, Plus, ChevronDown, Eye, Code, Clock } from 'lucide-react';
 
-const HttpClient = ({ selectedEnvironment, initialRequest, onRequestChange }) => {
+const HttpClient = ({ selectedEnvironment, initialRequest, onRequestChange, onSaveRequest}) => {
   useEffect(() => {
     if (initialRequest) {
       setRequest(initialRequest);
@@ -215,7 +215,10 @@ const HttpClient = ({ selectedEnvironment, initialRequest, onRequestChange }) =>
       <div className="p-6 border-b border-gray-200">
         <div className="flex items-center space-x-4 mb-6">
           <h2 className="text-xl font-semibold text-gray-900">HTTP Client</h2>
-          <button className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1 rounded text-sm">
+          <button 
+            onClick={() => onSaveRequest && onSaveRequest(request)}
+            className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1 rounded text-sm"
+          >
             <Save size={14} className="inline mr-1" />
             Save Request
           </button>
