@@ -20,7 +20,7 @@ from security_scanner import *
 from email_service import *
 from notification_engine import *
 
-# Structure for running our security scans
+# Structure for running ouI donr security scans
 class SecurityScanRequest(BaseModel):
     target_url: str
     method: str = "GET"
@@ -927,3 +927,90 @@ async def execute_collection_request(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Request execution failed: {str(e)}")
 
+@app.post("/notifications/rules", response_model=NotificationRule)
+async def create_notification_rule(
+    rule_data: NotificationCreate,
+    current_user: User = Depends(get_current_user)
+):
+    """Create a new notification rule"""
+    print(f"Creating notification rule: {rule_data}")  # Debug log
+    
+    # Verify user owns the session
+    session_data = redis_client.get(f"session:{rule_data.session_id}")
+    if not session_data:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    session = json.loads(session_data)
+    if session["owner_id"] != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    # Create rule
+    rule_id = str(uuid.uuid4())[:8]
+    rule = NotificationRule(
+        id=rule_id,
+        session_id=rule_data.session_id,
+        name=rule_data.name,
+        condition=rule_data.condition,
+        operator=rule_data.operator,
+        value=rule_data.value,
+        email_recipients=rule_data.email_recipients,
+        cooldown_minutes=rule_data.cooldown_minutes,
+        created_at=datetime.now().isoformat()
+    )
+    
+    # Save to Redis
+    existing_rules = redis_client.get(f"notification_rules:{rule_data.session_id}")
+    rules = json.loads(existing_rules) if existing_rules else []
+    rules.append(rule.dict())
+    
+    redis_client.set(f"notification_rules:{rule_data.session_id}", json.dumps(rules))
+    
+    print(f"✅ Created notification rule {rule_id} for session {rule_data.session_id}")  # Debug log
+    
+    return rule
+
+@app.get("/notifications/rules/{session_id}")
+async def get_notification_rules(
+    session_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Get all notification rules for a session"""
+    # Verify user owns the session
+    session_data = redis_client.get(f"session:{session_id}")
+    if not session_data:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    session = json.loads(session_data)
+    if session["owner_id"] != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    rules_data = redis_client.get(f"notification_rules:{session_id}")
+    if not rules_data:
+        return []
+    
+    return json.loads(rules_data)
+
+@app.delete("/notifications/rules/{rule_id}")
+async def delete_notification_rule(
+    rule_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Delete a notification rule"""
+    # Find the rule across all sessions for this user
+    user_sessions = redis_client.smembers(f"user_sessions:{current_user.id}")
+    
+    for session_id in user_sessions:
+        session_id = session_id.decode() if isinstance(session_id, bytes) else session_id
+        rules_data = redis_client.get(f"notification_rules:{session_id}")
+        
+        if rules_data:
+            rules = json.loads(rules_data)
+            original_count = len(rules)
+            rules = [rule for rule in rules if rule['id'] != rule_id]
+            
+            if len(rules) < original_count:
+                # Rule was found and removed
+                redis_client.set(f"notification_rules:{session_id}", json.dumps(rules))
+                return {"message": "Rule deleted successfully"}
+    
+    raise HTTPException(status_code=404, detail="Rule not found")
