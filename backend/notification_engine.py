@@ -2,7 +2,7 @@ import json
 import re
 from datetime import datetime, timedelta
 from typing import Dict, Any, List
-from .models import NotificationRule, NotificationCondition
+from models import NotificationRule, NotificationCondition
 
 class NotificationEngine:
     def __init__(self, redis_client, email_service):
