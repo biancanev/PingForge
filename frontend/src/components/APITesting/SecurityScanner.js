@@ -77,7 +77,7 @@ const SecurityScanner = ({ request, onScanComplete }) => {
 
     console.log('Sending scan request:', scanRequest); // Debug log
 
-    const response = await fetch('/api/security-scan', {
+    const response = await fetch('https://pingforge.onrender.com/api/security-scan', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
