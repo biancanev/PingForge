@@ -641,7 +641,7 @@ async def capture_webhook(session_id: str, request: Request):
             content={"status": "error", "message": error_message}
         )
     
-    return {"status": "captured", "request_id": webhook_request["id"]}
+    return {"status": "captured", "request_id": request_data["id"]}
 
 @app.get("/sessions/{session_id}/requests")
 async def get_session_requests(session_id: str, current_user: User = Depends(get_current_user)):
