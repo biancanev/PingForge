@@ -44,62 +44,91 @@ const SecurityScanner = ({ request, onScanComplete }) => {
     }
   };
 
-  const runSecurityScan = async () => {
-    if (!request.url.trim()) {
-      setError('Please enter a URL to scan');
+ const runSecurityScan = async () => {
+  if (!request.url.trim()) {
+    setError('Please enter a URL to scan');
+    return;
+  }
+
+  setScanning(true);
+  setError(null);
+  
+  try {
+    const token = localStorage.getItem('auth_token');
+    if (!token) {
+      setError('Authentication required');
       return;
     }
 
-    setScanning(true);
-    setError(null);
-    
-    try {
-      const token = localStorage.getItem('auth_token');
-      if (!token) {
-        setError('Authentication required');
-        return;
+    // Convert headers array to object
+    const headersObj = {};
+    request.headers.forEach(header => {
+      if (header.enabled && header.key && header.value) {
+        headersObj[header.key] = header.value;
       }
+    });
 
-      // Convert headers array to object
-      const headersObj = {};
-      request.headers.forEach(header => {
-        if (header.enabled && header.key && header.value) {
-          headersObj[header.key] = header.value;
-        }
-      });
+    const scanRequest = {
+      target_url: request.url,
+      method: request.method,
+      headers: headersObj,
+      auth: request.auth
+    };
 
-      const scanRequest = {
-        target_url: request.url,
-        method: request.method,
-        headers: headersObj,
-        auth: request.auth
-      };
+    console.log('Sending scan request:', scanRequest); // Debug log
 
-      const response = await fetch('/api/security-scan', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(scanRequest)
-      });
+    const response = await fetch('/api/security-scan', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(scanRequest)
+    });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Scan failed');
-      }
+    console.log('Response status:', response.status); // Debug log
+    console.log('Response headers:', response.headers); // Debug log
 
-      const data = await response.json();
-      setScanResults(data.result);
-      onScanComplete && onScanComplete(data.result);
+    // Check if response is actually JSON
+    const contentType = response.headers.get('content-type');
+    console.log('Content-Type:', contentType); // Debug log
+
+    if (!response.ok) {
+      // Try to get error as text first
+      const errorText = await response.text();
+      console.log('Error response text:', errorText); // Debug log
       
-    } catch (error) {
-      console.error('Security scan error:', error);
-      setError(error.message || 'Failed to run security scan');
-    } finally {
-      setScanning(false);
+      let errorData;
+      try {
+        errorData = JSON.parse(errorText);
+      } catch {
+        throw new Error(`HTTP ${response.status}: ${errorText || 'Unknown error'}`);
+      }
+      throw new Error(errorData.detail || 'Scan failed');
     }
-  };
+
+    // Get response as text first to see what we're getting
+    const responseText = await response.text();
+    console.log('Response text:', responseText); // Debug log
+
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error('JSON parse error:', parseError);
+      throw new Error(`Invalid JSON response: ${responseText.substring(0, 100)}...`);
+    }
+
+    setScanResults(data.result);
+    onScanComplete && onScanComplete(data.result);
+    
+  } catch (error) {
+    console.error('Security scan error:', error);
+    setError(error.message || 'Failed to run security scan');
+  } finally {
+    setScanning(false);
+  }
+};
 
   const exportResults = () => {
     if (!scanResults) return;
