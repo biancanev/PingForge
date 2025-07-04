@@ -54,7 +54,7 @@ const SecurityScanner = ({ request, onScanComplete }) => {
     setError(null);
     
     try {
-      const token = localStorage.getItem('authToken');
+      const token = localStorage.getItem('auth_token');
       if (!token) {
         setError('Authentication required');
         return;
