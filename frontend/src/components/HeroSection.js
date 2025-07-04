@@ -9,11 +9,12 @@ const HeroSection = ({ onSessionCreated }) => {
         <Globe className="text-white" size={40} />
       </div>
       <h2 className="text-4xl font-bold text-gray-900 mb-4">
-        Debug Webhooks Like a Pro
+        Debug APIs Like a Pro
       </h2>
       <p className="text-xl text-gray-600 max-w-3xl mx-auto mb-8">
         Generate instant webhook URLs, capture requests in real-time, inspect payloads, 
-        and replay requests to your endpoints. Perfect for development and testing.
+        and replay requests to your endpoints. Send custom HTTP payloads to your APIs.
+        Perfect for development and testing.
       </p>
       <div className="flex justify-center">
         <WebhookCreator onSessionCreated={onSessionCreated} />

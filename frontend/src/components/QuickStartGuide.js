@@ -1,7 +1,7 @@
 import React from 'react';
 
 const QuickStartGuide = () => {
-  const steps = [
+  const steps1 = [
     {
       number: "1",
       title: "Generate URL",
@@ -18,6 +18,23 @@ const QuickStartGuide = () => {
       description: "Watch requests appear in real-time and inspect their contents"
     }
   ];
+  const steps2 = [
+    {
+      number: "1",
+      title: "Choose Method",
+      description: "Choose an HTTP method to test your API"
+    },
+    {
+      number: "2", 
+      title: "Craft Payload",
+      description: "Add your desired HTTP headers and body. Store important variables in environments"
+    },
+    {
+      number: "3",
+      title: "Test API",
+      description: "Send your HTTP request and get instant results. Automate the process with collections"
+    }
+  ];
 
   return (
     <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden mt-16">
@@ -25,8 +42,20 @@ const QuickStartGuide = () => {
         <h3 className="text-lg font-semibold text-gray-900">Quick Start Guide</h3>
       </div>
       <div className="p-6">
+        <h4 className="text-lg font-semibold text-gray-900">Build Your Webhook</h4>
         <div className="grid md:grid-cols-3 gap-6">
-          {steps.map((step, index) => (
+          {steps1.map((step, index) => (
+            <QuickStartStep 
+              key={index}
+              number={step.number}
+              title={step.title}
+              description={step.description}
+            />
+          ))}
+        </div>
+        <h4 className="text-lg font-semibold text-gray-900">Test Your Endpoints</h4>
+        <div className="grid md:grid-cols-3 gap-6">
+          {steps1.map((step, index) => (
             <QuickStartStep 
               key={index}
               number={step.number}

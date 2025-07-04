@@ -8,9 +8,18 @@ import httpx
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 import os
+from pydantic import BaseModel
 
 from auth import *
 from models import *
+from security_scanner import *
+
+# Structure for running our security scans
+class SecurityScanRequest(BaseModel):
+    target_url: str
+    method: str = "GET"
+    headers: Dict[str, str] = {}
+    auth: Optional[Dict[str, Any]] = None
 
 # Helper function for TTL
 def get_lifespan_seconds(lifespan: SessionLifespan) -> int:
@@ -601,3 +610,71 @@ async def execute_collection_request(
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Request execution failed: {str(e)}")
+
+@app.post("/api/security-scan")
+async def run_security_scan(
+    scan_request: SecurityScanRequest,
+    current_user: User = Depends(get_current_user)
+):
+    """Run automated security scan on target URL"""
+    try:
+        # Prepare headers including auth
+        headers = scan_request.headers.copy()
+        
+        if scan_request.auth:
+            if scan_request.auth.get("type") == "bearer" and scan_request.auth.get("token"):
+                headers["Authorization"] = f"Bearer {scan_request.auth['token']}"
+            elif scan_request.auth.get("type") == "basic":
+                username = scan_request.auth.get("username", "")
+                password = scan_request.auth.get("password", "")
+                import base64
+                credentials = base64.b64encode(f"{username}:{password}".encode()).decode()
+                headers["Authorization"] = f"Basic {credentials}"
+        
+        # Create scanner and run scan
+        scanner = SecurityScanner(
+            target_url=scan_request.target_url,
+            headers=headers,
+            timeout=15
+        )
+        
+        result = await scanner.run_comprehensive_scan()
+        
+        # Store scan result for user
+        scan_id = str(uuid.uuid4())
+        scan_data = {
+            "id": scan_id,
+            "user_id": current_user.id,
+            "result": asdict(result),
+            "created_at": datetime.now().isoformat()
+        }
+        
+        redis_client.setex(f"security_scan:{scan_id}", 86400 * 7, json.dumps(scan_data))
+        
+        return {
+            "scan_id": scan_id,
+            "result": asdict(result)
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Security scan failed: {str(e)}")
+
+@app.get("/api/security-scan/{scan_id}")
+async def get_security_scan(scan_id: str, current_user: User = Depends(get_current_user)):
+    """Retrieve security scan results"""
+    scan_data = redis_client.get(f"security_scan:{scan_id}")
+    if not scan_data:
+        raise HTTPException(status_code=404, detail="Scan not found")
+    
+    scan_info = json.loads(scan_data)
+    if scan_info["user_id"] != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to view this scan")
+    
+    return scan_info["result"]
+
+@app.get("/api/security-scans")
+async def list_security_scans(current_user: User = Depends(get_current_user)):
+    """List user's security scans"""
+    # This would require a more sophisticated storage approach for production
+    # For now, we'll return a simple response
+    return {"message": "Scan history feature coming soon"}
