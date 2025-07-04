@@ -927,48 +927,6 @@ async def execute_collection_request(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Request execution failed: {str(e)}")
 
-@app.post("/notifications/rules", response_model=NotificationRule)
-async def create_notification_rule(
-    rule_data: NotificationCreate,
-    current_user: User = Depends(get_current_user)
-):
-    """Create a new notification rule"""
-    print(f"Creating notification rule: {rule_data}")  # Debug log
-    
-    # Verify user owns the session
-    session_data = redis_client.get(f"session:{rule_data.session_id}")
-    if not session_data:
-        raise HTTPException(status_code=404, detail="Session not found")
-    
-    session = json.loads(session_data)
-    if session["owner_id"] != current_user.id:
-        raise HTTPException(status_code=403, detail="Not authorized")
-    
-    # Create rule
-    rule_id = str(uuid.uuid4())[:8]
-    rule = NotificationRule(
-        id=rule_id,
-        session_id=rule_data.session_id,
-        name=rule_data.name,
-        condition=rule_data.condition,
-        operator=rule_data.operator,
-        value=rule_data.value,
-        email_recipients=rule_data.email_recipients,
-        cooldown_minutes=rule_data.cooldown_minutes,
-        created_at=datetime.now().isoformat()
-    )
-    
-    # Save to Redis
-    existing_rules = redis_client.get(f"notification_rules:{rule_data.session_id}")
-    rules = json.loads(existing_rules) if existing_rules else []
-    rules.append(rule.dict())
-    
-    redis_client.set(f"notification_rules:{rule_data.session_id}", json.dumps(rules))
-    
-    print(f"✅ Created notification rule {rule_id} for session {rule_data.session_id}")  # Debug log
-    
-    return rule
-
 @app.get("/notifications/rules/{session_id}")
 async def get_notification_rules(
     session_id: str,
