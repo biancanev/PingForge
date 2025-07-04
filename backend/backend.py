@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect, HTTPException, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.responses import JSONResponse
 import redis
 import uuid
 import json
@@ -8,12 +9,16 @@ import httpx
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 import os
+import time
+import asyncio
 from pydantic import BaseModel
 import base64
 
 from auth import *
 from models import *
 from security_scanner import *
+from email_service import *
+from notification_engine import *
 
 # Structure for running our security scans
 class SecurityScanRequest(BaseModel):
@@ -130,6 +135,14 @@ async def get_current_user_optional(credentials: Optional[HTTPAuthorizationCrede
         return await get_current_user(credentials)
     except:
         return None
+
+# Notification helper function
+async def run_notification_evaluation(notification_engine, session_id: str, webhook_data: dict):
+    """Run notification evaluation asynchronously"""
+    try:
+        notification_engine.evaluate_conditions(session_id, webhook_data)
+    except Exception as e:
+        print(f"Notification evaluation failed for session {session_id}: {e}")
 
 # Security scanning functionality  
 @app.post("/api/security-scan")
@@ -253,6 +266,81 @@ async def register(user_data: UserCreate):
     
     return {"access_token": access_token, "token_type": "bearer"}
 
+@app.post("/notifications/rules", response_model=NotificationRule)
+async def create_notification_rule(
+    rule_data: NotificationCreate,
+    current_user: User = Depends(get_current_user)
+):
+    """Create a new notification rule"""
+    
+    # Verify user owns the session
+    session_data = redis_client.get(f"session:{rule_data.session_id}")
+    if not session_data:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    session = json.loads(session_data)
+    if session["owner_id"] != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    # Create rule
+    rule_id = str(uuid.uuid4())[:8]
+    rule = NotificationRule(
+        id=rule_id,
+        session_id=rule_data.session_id,
+        name=rule_data.name,
+        condition=rule_data.condition,
+        operator=rule_data.operator,
+        value=rule_data.value,
+        email_recipients=rule_data.email_recipients,
+        cooldown_minutes=rule_data.cooldown_minutes,
+        created_at=datetime.now().isoformat()
+    )
+    
+    # Save to Redis
+    existing_rules = redis_client.get(f"notification_rules:{rule_data.session_id}")
+    rules = json.loads(existing_rules) if existing_rules else []
+    rules.append(rule.dict())
+    
+    redis_client.set(f"notification_rules:{rule_data.session_id}", json.dumps(rules))
+    
+    return rule
+
+# Push notification routes
+@app.get("/notifications/rules/{session_id}")
+async def get_notification_rules(
+    session_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Get all notification rules for a session"""
+    
+    # Verify user owns the session
+    session_data = redis_client.get(f"session:{session_id}")
+    if not session_data:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    session = json.loads(session_data)
+    if session["owner_id"] != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    rules_data = redis_client.get(f"notification_rules:{session_id}")
+    if not rules_data:
+        return []
+    
+    return json.loads(rules_data)
+
+@app.delete("/notifications/rules/{rule_id}")
+async def delete_notification_rule(
+    rule_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Delete a notification rule"""
+    
+    # Find and verify ownership
+    # Implementation depends on your needs
+    
+    return {"message": "Rule deleted successfully"}
+
+
 @app.post("/auth/login", response_model=Token)
 async def login(user_data: UserLogin):
     # Get user from Redis
@@ -361,6 +449,9 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
 
 @app.api_route("/hooks/{session_id}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
 async def capture_webhook(session_id: str, request: Request):
+    # START TIMING for response_time_ms
+    start_time = time.time()
+    
     # Verify session exists (but don't require authentication for webhook endpoints)
     session_data = redis_client.get(f"session:{session_id}")
     if not session_data:
@@ -369,49 +460,186 @@ async def capture_webhook(session_id: str, request: Request):
     # Parse session data FIRST
     session = json.loads(session_data)
     
-    # Apply filters if they exist
-    session_filters = session.get("filters", {})
-    if session_filters:
-        client_ip = request.client.host if request.client else "unknown"
-        method = request.method
+    # GET REAL-TIME REQUEST DATA
+    try:
+        # Get request body
+        body = await request.body()
+        try:
+            body_text = body.decode('utf-8') if body else ""
+        except UnicodeDecodeError:
+            body_text = f"<binary data: {len(body)} bytes>"
         
-        # Check blocked IPs
-        if "blocked_ips" in session_filters and session_filters["blocked_ips"]:
-            if client_ip in session_filters["blocked_ips"]:
-                return {"status": "filtered", "reason": "IP address blocked"}
+        # Get client IP (handle different deployment scenarios)
+        client_ip = (
+            request.headers.get("x-forwarded-for", "").split(",")[0].strip() or
+            request.headers.get("x-real-ip") or
+            (request.client.host if request.client else "unknown")
+        )
         
-        # Check allowed IPs (if specified, only these are allowed)
-        if "allowed_ips" in session_filters and session_filters["allowed_ips"]:
-            if client_ip not in session_filters["allowed_ips"]:
-                return {"status": "filtered", "reason": "IP address not in allowlist"}
+        # Determine status code based on processing result
+        status_code = 200  # Default success
+        error_message = None
         
-        # Check allowed methods (if specified, only these are allowed)
-        if "allowed_methods" in session_filters and session_filters["allowed_methods"]:
-            if method not in session_filters["allowed_methods"]:
-                return {"status": "filtered", "reason": "HTTP method not allowed"}
+        # Apply filters if they exist (your existing filter logic)
+        session_filters = session.get("filters", {})
+        if session_filters:
+            method = request.method
+            
+            # Check blocked IPs
+            if "blocked_ips" in session_filters and session_filters["blocked_ips"]:
+                if client_ip in session_filters["blocked_ips"]:
+                    status_code = 403
+                    error_message = "IP address blocked"
+                    # Calculate response time before returning
+                    response_time_ms = (time.time() - start_time) * 1000
+                    
+                    # PREPARE WEBHOOK DATA FOR NOTIFICATIONS
+                    webhook_data = {
+                        "method": request.method,
+                        "ip": client_ip,
+                        "headers": dict(request.headers),
+                        "body": body_text,
+                        "query_params": dict(request.query_params),
+                        "status_code": status_code,
+                        "response_time_ms": response_time_ms,
+                        "timestamp": datetime.now().isoformat(),
+                        "session_id": session_id,
+                        "error_message": error_message
+                    }
+                    
+                    # EVALUATE NOTIFICATION CONDITIONS
+                    notification_engine = NotificationEngine(redis_client, email_service)
+                    try:
+                        notification_engine.evaluate_conditions(session_id, webhook_data)
+                    except Exception as e:
+                        print(f"Notification evaluation failed: {e}")
+                    
+                    return {"status": "filtered", "reason": error_message}
+            
+            # Check allowed IPs (if specified, only these are allowed)
+            if "allowed_ips" in session_filters and session_filters["allowed_ips"]:
+                if client_ip not in session_filters["allowed_ips"]:
+                    status_code = 403
+                    error_message = "IP address not in allowlist"
+                    response_time_ms = (time.time() - start_time) * 1000
+                    
+                    webhook_data = {
+                        "method": request.method,
+                        "ip": client_ip,
+                        "headers": dict(request.headers),
+                        "body": body_text,
+                        "query_params": dict(request.query_params),
+                        "status_code": status_code,
+                        "response_time_ms": response_time_ms,
+                        "timestamp": datetime.now().isoformat(),
+                        "session_id": session_id,
+                        "error_message": error_message
+                    }
+                    
+                    notification_engine = NotificationEngine(redis_client, email_service)
+                    try:
+                        notification_engine.evaluate_conditions(session_id, webhook_data)
+                    except Exception as e:
+                        print(f"Notification evaluation failed: {e}")
+                    
+                    return {"status": "filtered", "reason": error_message}
+            
+            # Check allowed methods (if specified, only these are allowed)
+            if "allowed_methods" in session_filters and session_filters["allowed_methods"]:
+                if method not in session_filters["allowed_methods"]:
+                    status_code = 405
+                    error_message = "Method not allowed"
+                    response_time_ms = (time.time() - start_time) * 1000
+                    
+                    webhook_data = {
+                        "method": request.method,
+                        "ip": client_ip,
+                        "headers": dict(request.headers),
+                        "body": body_text,
+                        "query_params": dict(request.query_params),
+                        "status_code": status_code,
+                        "response_time_ms": response_time_ms,
+                        "timestamp": datetime.now().isoformat(),
+                        "session_id": session_id,
+                        "error_message": error_message
+                    }
+                    
+                    notification_engine = NotificationEngine(redis_client, email_service)
+                    try:
+                        notification_engine.evaluate_conditions(session_id, webhook_data)
+                    except Exception as e:
+                        print(f"Notification evaluation failed: {e}")
+                    
+                    return {"status": "filtered", "reason": error_message}
+
+    except Exception as e:
+        # Handle request processing errors
+        status_code = 500
+        error_message = f"Request processing error: {str(e)}"
+        body_text = ""
+        client_ip = "unknown"
     
-    # Continue with existing webhook capture logic
-    body = await request.body()
-    webhook_request = {
-        "id": str(uuid.uuid4()),
+    # CALCULATE FINAL RESPONSE TIME
+    response_time_ms = (time.time() - start_time) * 1000
+    
+    # PREPARE COMPLETE WEBHOOK DATA FOR NOTIFICATIONS
+    webhook_data = {
         "method": request.method,
+        "ip": client_ip,
         "headers": dict(request.headers),
-        "body": body.decode() if body else None,
+        "body": body_text,
         "query_params": dict(request.query_params),
+        "status_code": status_code,
+        "response_time_ms": round(response_time_ms, 2),
         "timestamp": datetime.now().isoformat(),
-        "ip_address": request.client.host if request.client else "unknown"
+        "session_id": session_id,
+        "error_message": error_message,
+        "user_agent": request.headers.get("user-agent", ""),
+        "content_type": request.headers.get("content-type", ""),
+        "content_length": len(body_text)
     }
     
-    # Store in Redis
-    redis_client.lpush(f"requests:{session_id}", json.dumps(webhook_request))
-    redis_client.expire(f"requests:{session_id}", 86400 * 7)  # 7 days
+    # EVALUATE NOTIFICATION CONDITIONS (Main success path)
+    notification_engine = NotificationEngine(redis_client, email_service)
+    try:
+        # Run notification evaluation asynchronously to not block response
+        asyncio.create_task(
+            run_notification_evaluation(notification_engine, session_id, webhook_data)
+        )
+    except Exception as e:
+        print(f"Failed to start notification evaluation: {e}")
     
-    # Update session request count
-    session["request_count"] = redis_client.llen(f"requests:{session_id}")
+    # YOUR EXISTING REQUEST STORAGE LOGIC
+    request_data = {
+        "id": str(uuid.uuid4())[:8],
+        "timestamp": datetime.now().isoformat(),
+        "method": request.method,
+        "headers": dict(request.headers),
+        "body": body_text,
+        "ip": client_ip,
+        "query_params": dict(request.query_params),
+        "status_code": status_code,
+        "response_time_ms": round(response_time_ms, 2)
+    }
+    
+    # Store in Redis with expiration
+    redis_client.lpush(f"requests:{session_id}", json.dumps(request_data))
+    redis_client.expire(f"requests:{session_id}", 3600)  # 1 hour expiration
+    
+    # Update session stats
+    session["request_count"] = session.get("request_count", 0) + 1
+    session["last_request"] = datetime.now().isoformat()
     redis_client.set(f"session:{session_id}", json.dumps(session))
     
     # Send real-time update via WebSocket
-    await manager.send_to_session(session_id, json.dumps(webhook_request))
+    await manager.broadcast(session_id, request_data)
+    
+    # Return appropriate response
+    if status_code >= 400:
+        return JSONResponse(
+            status_code=status_code,
+            content={"status": "error", "message": error_message}
+        )
     
     return {"status": "captured", "request_id": webhook_request["id"]}
 

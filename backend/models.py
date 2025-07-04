@@ -111,3 +111,35 @@ class Session(BaseModel):
     is_active: bool = True
     lifespan: Optional[SessionLifespan] = SessionLifespan.TWENTY_FOUR_HOURS
     filters: Optional[Dict] = None
+
+class NotificationCondition(str, Enum):
+    STATUS_CODE = "status_code"
+    METHOD = "method"
+    IP_ADDRESS = "ip_address"
+    HEADER_CONTAINS = "header_contains"
+    BODY_CONTAINS = "body_contains"
+    QUERY_PARAM = "query_param"
+    RESPONSE_TIME = "response_time"
+    RATE_LIMIT = "rate_limit"
+
+class NotificationRule(BaseModel):
+    id: str
+    session_id: str
+    name: str
+    condition: NotificationCondition
+    operator: str  # "equals", "contains", "greater_than", "less_than", "in_range"
+    value: Any  # The value to compare against
+    email_recipients: List[str]
+    is_active: bool = True
+    cooldown_minutes: int = 5  # Prevent spam
+    created_at: str
+    last_triggered: Optional[str] = None
+
+class NotificationCreate(BaseModel):
+    session_id: str
+    name: str
+    condition: NotificationCondition
+    operator: str
+    value: Any
+    email_recipients: List[str]
+    cooldown_minutes: int = 5

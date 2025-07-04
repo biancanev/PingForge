@@ -7,6 +7,7 @@ import SessionStats from '../components/SessionStats';
 import IPMaskingSettings from '../components/IPMaskingSettings';
 import { useIPMasking } from '../hooks/useIPMasking';
 import { BarChart3, List, Settings, ArrowLeft } from 'lucide-react';
+import NotificationRules from '../components/NotificationRules'
 
 const ActiveSession = ({ session, onSessionCreated, onBack }) => {
   const [activeTab, setActiveTab] = useState('requests');
@@ -190,6 +191,7 @@ const ActiveSession = ({ session, onSessionCreated, onBack }) => {
                   onMaskingLevelChange={setMaskingLevel}
                   showInline={false}
                 />
+                <NotificationRules sessionId={session.id} />
               </div>
             </div>
           )}
