@@ -617,6 +617,11 @@ async def run_security_scan(
     current_user: User = Depends(get_current_user)
 ):
     """Run automated security scan on target URL"""
+    print("=== SECURITY SCAN REQUEST RECEIVED ===")  # Debug
+    print(f"Target URL: {scan_request.target_url}")      # Debug
+    print(f"Method: {scan_request.method}")               # Debug
+    print(f"User: {current_user.email}")                 # Debug
+    print("=====================================")  
     try:
         # Prepare headers including auth
         headers = scan_request.headers.copy()
