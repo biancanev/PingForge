@@ -42,7 +42,7 @@ const NotificationRules = ({ sessionId }) => {
     e.preventDefault();
     
     try {
-      const response = await fetch('/api/notifications/rules', {
+      const response = await fetch('https://pingforge.onrender.com/api/notifications/rules', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
