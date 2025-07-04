@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 import os
 from pydantic import BaseModel
+import base64
 
 from auth import *
 from models import *
@@ -144,50 +145,57 @@ async def run_security_scan(
     print("=============================")
     
     try:
-        # For now, return a simple mock response to test
-        mock_result = {
-            "target_url": scan_request.target_url,
-            "scan_duration": 2.1,
-            "total_findings": 2,
-            "findings_by_level": {
-                "critical": 0,
-                "high": 1,
-                "medium": 1,
-                "low": 0,
-                "info": 0
-            },
-            "findings": [
-                {
-                    "vulnerability_type": "missing_security_headers",
-                    "level": "medium",
-                    "title": "Missing Security Headers",
-                    "description": "The application is missing important security headers.",
-                    "evidence": "Missing headers: x-frame-options, x-content-type-options",
-                    "recommendation": "Implement security headers to improve protection.",
-                    "cwe_id": "CWE-693"
-                },
-                {
-                    "vulnerability_type": "potential_sql_injection",
-                    "level": "high", 
-                    "title": "Potential SQL Injection",
-                    "description": "URL contains SQL injection patterns.",
-                    "evidence": f"Suspicious parameter detected: {scan_request.target_url}",
-                    "recommendation": "Implement proper input validation.",
-                    "cwe_id": "CWE-89"
-                }
-            ],
-            "scan_timestamp": "2025-01-04 12:00:00"
+        # Prepare headers including auth
+        headers = scan_request.headers.copy()
+        
+        if scan_request.auth:
+            if scan_request.auth.get("type") == "bearer" and scan_request.auth.get("token"):
+                headers["Authorization"] = f"Bearer {scan_request.auth['token']}"
+            elif scan_request.auth.get("type") == "basic":
+                username = scan_request.auth.get("username", "")
+                password = scan_request.auth.get("password", "")
+                credentials = base64.b64encode(f"{username}:{password}".encode()).decode()
+                headers["Authorization"] = f"Basic {credentials}"
+            elif scan_request.auth.get("type") == "api-key":
+                key = scan_request.auth.get("key", "")
+                value = scan_request.auth.get("value", "")
+                if key and value:
+                    headers[key] = value
+        
+        # Create scanner using YOUR implemented security_scanner.py
+        scanner = SecurityScanner(
+            target_url=scan_request.target_url,
+            headers=headers,
+            timeout=15
+        )
+        
+        # Run YOUR comprehensive scan
+        result = await scanner.run_comprehensive_scan()
+        
+        print(f"Scan completed: {result.total_findings} findings")
+        
+        # Store scan result for user
+        scan_id = str(uuid.uuid4())
+        scan_data = {
+            "id": scan_id,
+            "user_id": current_user.id,
+            "result": asdict(result),
+            "created_at": datetime.now().isoformat()
         }
         
-        scan_id = str(uuid.uuid4())
+        # Convert enum values for JSON serialization
+        scan_data_json = json.dumps(scan_data, default=str)
+        redis_client.setex(f"security_scan:{scan_id}", 86400 * 7, scan_data_json)
         
         return {
             "scan_id": scan_id,
-            "result": mock_result
+            "result": asdict(result)
         }
         
     except Exception as e:
         print(f"Security scan error: {e}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Security scan failed: {str(e)}")
 
 @app.get("/api/security-scan/{scan_id}")
