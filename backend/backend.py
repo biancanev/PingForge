@@ -632,7 +632,7 @@ async def capture_webhook(session_id: str, request: Request):
     redis_client.set(f"session:{session_id}", json.dumps(session))
     
     # Send real-time update via WebSocket
-    await manager.broadcast(session_id, request_data)
+    await manager.send_to_session(session_id, request_data)
     
     # Return appropriate response
     if status_code >= 400:
