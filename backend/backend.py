@@ -296,12 +296,29 @@ async def create_notification_rule(
         created_at=datetime.now().isoformat()
     )
     
+    print(f"📝 Created rule object: {rule}")
+    
     # Save to Redis
     existing_rules = redis_client.get(f"notification_rules:{rule_data.session_id}")
     rules = json.loads(existing_rules) if existing_rules else []
-    rules.append(rule.dict())
+    print(f"📦 Existing rules count: {len(rules)}")
     
-    redis_client.set(f"notification_rules:{rule_data.session_id}", json.dumps(rules))
+    rules.append(rule.dict())
+    print(f"📦 New rules count: {len(rules)}")
+    
+    # Save to Redis with debug
+    redis_key = f"notification_rules:{rule_data.session_id}"
+    redis_result = redis_client.set(redis_key, json.dumps(rules))
+    print(f"💾 Redis save result: {redis_result}")
+    print(f"💾 Redis key: {redis_key}")
+    
+    # Verify it was saved
+    saved_data = redis_client.get(redis_key)
+    if saved_data:
+        saved_rules = json.loads(saved_data)
+        print(f"✅ Verified: {len(saved_rules)} rules saved to Redis")
+    else:
+        print(f"❌ ERROR: No data found in Redis after save!")
     
     return rule
 
